@@ -7,7 +7,7 @@ from io import BytesIO
 aws_access_key_id = os.environ['AWS_ACCESS_KEY_ID']
 aws_secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
 container = os.environ['CONTAINER']
-container_args = sys.argv[1]
+container_args = sys.argv[2]
 
 if not container_args:
     print ("No arguments. No script or executable supplied for a container run.")
