@@ -117,7 +117,7 @@ download(local_file_name, s3_bucket, s3_object_key)
 shutil.copy(local_file_name, "/var/opt/yellowdog/agent/mnt")
 
 
-cmd_str = "docker run --rm -v /var/opt/yellowdog/agent/mnt:/mnt {} {} | tee -a /mnt/output1.txt".format(container, container_args)
+cmd_str = "docker run --rm -v /var/opt/yellowdog/agent/mnt:/mnt {} {} | tee -a /var/opt/yellowdog/agent/mnt/output1.txt".format(container, container_args)
 print ("\nLaunching: {}".format(cmd_str))
 command = Command(cmd_str)
 threads = []
