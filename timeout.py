@@ -1,5 +1,61 @@
-#!/usr/bin/env python3
-import subprocess, threading, sys, os, signal, atexit
+#! /usr/bin/env python3
+import subprocess, threading, sys, os, signal, atexit, shutil
+import boto3
+from boto3 import client
+from io import BytesIO
+
+aws_access_key_id = os.environ['AWS_ACCESS_KEY_ID']
+aws_secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
+container = os.environ['CONTAINER']
+container_args = sys.argv[1]
+
+if not container_args:
+    print ("No arguments. No script or executable supplied for a container run.")
+    sys.exit(1)
+
+def upload(local_file_name, s3_bucket, s3_object_key):
+
+    my_abs_path = ("{}/{}".format(os.getcwd(),local_file_name))
+    try:
+        os.path.isfile(my_abs_path)
+    except:
+        print("{} does not exist locally or not readable".format(my_abs_path))
+        sys.exit(1)
+
+    total_length = os.path.getsize(local_file_name)
+    uploaded = 0
+
+    def progress(chunk):
+        nonlocal uploaded
+        uploaded += chunk
+        done = int(50 * uploaded / total_length)
+        sys.stdout.write("\r[%s%s]" % ('=' * done, ' ' * (50-done)) )
+        sys.stdout.flush()
+
+    print(f'Uploading {s3_object_key}')
+    #s3_client.download_fileobj(s3_bucket, s3_object_key, f, Callback=progress)
+    s3_client.upload_file(local_file_name, s3_bucket, s3_object_key, Callback=progress)
+
+def download(local_file_name, s3_bucket, s3_object_key):
+
+    try:
+        meta_data = s3_client.head_object(Bucket=s3_bucket, Key=s3_object_key)
+    except:
+        print("{} does not exist in bucket or not readable".format(s3_object_key))
+        sys.exit(1)
+    total_length = int(meta_data.get('ContentLength', 0))
+    downloaded = 0
+
+    def progress(chunk):
+        nonlocal downloaded
+        downloaded += chunk
+        done = int(50 * downloaded / total_length)
+        sys.stdout.write("\r[%s%s]" % ('=' * done, ' ' * (50-done)) )
+        sys.stdout.flush()
+
+    print(f'Downloading {s3_object_key}')
+    with open(local_file_name, 'wb') as f:
+        s3_client.download_fileobj(s3_bucket, s3_object_key, f, Callback=progress)
 
 class Command(object):
     def __init__(self, cmd):
@@ -31,32 +87,60 @@ class Command(object):
 #command = Command("ls -al;uname -a;hostname;sleep 3")
 #command = Command("echo 'Process started'; sleep 10; echo 'Process finished'")
 
-container = "mpioperator/mpi-pi"
-container_args = "/home/mpiuser/pi"
+import boto3
+
+s3 = boto3.client('s3')
+s3_client = boto3.client('s3',
+                          aws_access_key_id=aws_access_key_id,
+                          aws_secret_access_key=aws_secret_access_key )
+
 
 cmd_str = "docker pull {}".format(container)
-print ("Launching: {}".format(cmd_str))
+print ("\nLaunching: {}".format(cmd_str))
 command = Command(cmd_str)
 threads = []
-output = command.run(timeout=50)
+output = command.run(timeout=5)
 print ("Return code: {}".format(output[0]))
 print ("Output:\n {}".format(output[1]))
 #print (output[0])
 #print (output[1])
 
-cmd_str = "docker run --rm -v /mnt:/mnt {} {}".format(container, container_args)
-print ("Launching: {}".format(cmd_str))
+local_file_name = 'application.yaml'
+s3_bucket = 's3-kingston-yd-test01'
+s3_object_key = 'application.yaml'
+
+
+
+download(local_file_name, s3_bucket, s3_object_key)
+
+# Copy file for into volume mount directory for container
+shutil.copy(local_file_name, "/mnt")
+
+
+cmd_str = "docker run --rm -v /mnt:/mnt {} {} | tee -a /mnt/output1.txt".format(container, container_args)
+print ("\nLaunching: {}".format(cmd_str))
 command = Command(cmd_str)
 threads = []
-output = command.run(timeout=50)
+output = command.run(timeout=5)
 print ("Return code: {}".format(output[0]))
 print ("Output:\n {}".format(output[1]))
+
+print ("\nUploading results back to S3 bucket")
+local_file_name = '/mnt/output1.txt'
+s3_bucket = 's3-kingston-yd-test01'
+s3_object_key = 'output1.txt'
+
+upload(local_file_name, s3_bucket, s3_object_key)
+
+sys.exit(0)
+
+
 
 cmd_str = "ls -la"
 print ("Launching: {}".format(cmd_str))
 command = Command(cmd_str)
 threads = []
-output = command.run(timeout=50)
+output = command.run(timeout=5)
 print ("Return code: {}".format(output[0]))
 print ("Output:\n {}".format(output[1]))
 sys.exit(0)
