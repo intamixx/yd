@@ -114,10 +114,10 @@ s3_object_key = 'application.yaml'
 download(local_file_name, s3_bucket, s3_object_key)
 
 # Copy file for into volume mount directory for container
-shutil.copy(local_file_name, "/mnt")
+shutil.copy(local_file_name, "/var/opt/yellowdog/agent/mnt")
 
 
-cmd_str = "docker run --rm -v /mnt:/mnt {} {} | tee -a /mnt/output1.txt".format(container, container_args)
+cmd_str = "docker run --rm -v /var/opt/yellowdog/agent/mnt:/mnt {} {} | tee -a /mnt/output1.txt".format(container, container_args)
 print ("\nLaunching: {}".format(cmd_str))
 command = Command(cmd_str)
 threads = []
