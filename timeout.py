@@ -126,7 +126,7 @@ print ("Return code: {}".format(output[0]))
 print ("Output:\n {}".format(output[1]))
 
 print ("\nUploading results back to S3 bucket")
-local_file_name = '/mnt/output1.txt'
+local_file_name = '/var/opt/yellowdog/agent/mnt/output1.txt'
 s3_bucket = 's3-kingston-yd-test01'
 s3_object_key = 'output1.txt'
 
