@@ -125,7 +125,7 @@ cmd_str = "docker run --rm -v /var/opt/yellowdog/agent/mnt:/mnt {} {} | tee -a /
 print ("\nLaunching: {}".format(cmd_str))
 command = Command(cmd_str)
 threads = []
-output = command.run(timeout=50)
+output = command.run(timeout=5)
 print ("Return code: {}".format(output[0]))
 print ("Output:\n {}".format(output[1]))
 
