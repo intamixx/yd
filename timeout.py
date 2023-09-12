@@ -8,8 +8,8 @@ aws_access_key_id = os.environ['AWS_ACCESS_KEY_ID']
 aws_secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
 container = os.environ['CONTAINER']
 
-#files_to_download = os.environ['FILES_TO_DOWNLOAD']
-#files_to_upload = os.environ['FILES_TO_UPLOAD']
+files_to_download = os.environ['FILES_TO_DOWNLOAD']
+files_to_upload = os.environ['FILES_TO_UPLOAD']
 
 container_args = sys.argv[2]
 
