@@ -7,6 +7,8 @@ from io import BytesIO
 aws_access_key_id = os.environ['AWS_ACCESS_KEY_ID']
 aws_secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
 container = os.environ['CONTAINER']
+files_to_download = os.environ['FILES_TO_DOWNLOAD']
+files_to_upload = os.environ['FILES_TO_UPLOAD']
 container_args = sys.argv[2]
 
 if not container_args:
@@ -105,19 +107,20 @@ print ("Output:\n {}".format(output[1]))
 #print (output[0])
 #print (output[1])
 
-local_file_name = 'application.yaml'
+#local_file_name = 'application.yaml'
 s3_bucket = 's3-kingston-yd-test01'
-s3_object_key = 'application.yaml'
+#s3_object_key = 'application.yaml'
 
-
-
-download(local_file_name, s3_bucket, s3_object_key)
+for s3_file_name in files_to_download:
+    #download(s3_file_name, s3_bucket, s3_object_key)
+    download(s3_file_name, s3_bucket, s3_file_name)
+    shutil.copy(s3_file_name, "/var/opt/yellowdog/agent/mnt")
 
 # Copy file for into volume mount directory for container
-shutil.copy(local_file_name, "/var/opt/yellowdog/agent/mnt")
+# shutil.copy(local_file_name, "/var/opt/yellowdog/agent/mnt")
 
 
-cmd_str = "docker run --rm -v /var/opt/yellowdog/agent/mnt:/mnt {} {} | tee -a /var/opt/yellowdog/agent/mnt/output1.txt".format(container, container_args)
+cmd_str = "docker run --rm -v /var/opt/yellowdog/agent/mnt:/mnt {} {} | tee -a /var/opt/yellowdog/agent/output1.txt".format(container, container_args)
 print ("\nLaunching: {}".format(cmd_str))
 command = Command(cmd_str)
 threads = []
