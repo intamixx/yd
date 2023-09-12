@@ -109,7 +109,7 @@ cmd_str = cmd_str.split()
 print ("\nLaunching: {}".format(cmd_str))
 command = Command(cmd_str)
 threads = []
-output = command.run(timeout=50, shell=False)
+output = command.run(timeout=180, shell=False)
 print ("Return code: {}".format(output[0]))
 print ("Output:\n {}".format(output[1]))
 #print (output[0])
@@ -134,7 +134,7 @@ cmd_str = cmd_str.split()
 print ("\nLaunching: {}".format(cmd_str))
 command = Command(cmd_str)
 threads = []
-output = command.run(timeout=1, shell=False)
+output = command.run(timeout=172800, shell=False)
 print ("Return code: {}".format(output[0]))
 print ("Output:\n {}".format(output[1]))
 
