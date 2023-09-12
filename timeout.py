@@ -134,7 +134,7 @@ cmd_str = cmd_str.split()
 print ("\nLaunching: {}".format(cmd_str))
 command = Command(cmd_str)
 threads = []
-output = command.run(timeout=15, shell=False)
+output = command.run(timeout=2, shell=False)
 print ("Return code: {}".format(output[0]))
 print ("Output:\n {}".format(output[1]))
 
