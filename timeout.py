@@ -7,12 +7,18 @@ from io import BytesIO
 aws_access_key_id = os.environ['AWS_ACCESS_KEY_ID']
 aws_secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
 container = os.environ['CONTAINER']
-files_to_download = os.environ['FILES_TO_DOWNLOAD']
-files_to_upload = os.environ['FILES_TO_UPLOAD']
+
+#files_to_download = os.environ['FILES_TO_DOWNLOAD']
+#files_to_upload = os.environ['FILES_TO_UPLOAD']
+
 container_args = sys.argv[2]
 
 if not container_args:
     print ("No arguments. No script or executable supplied for a container run.")
+    sys.exit(1)
+
+def error():
+    print ("OH NO, timeout?")
     sys.exit(1)
 
 def upload(local_file_name, s3_bucket, s3_object_key):
@@ -64,10 +70,10 @@ class Command(object):
         self.cmd = cmd
         self.process = None
 
-    def run(self, timeout):
+    def run(self, timeout, shell):
         def target():
             print ('Thread started')
-            self.process = subprocess.Popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+            self.process = subprocess.Popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=shell)
             self.out = self.process.stdout.read()
             self.out = (self.out.decode('UTF-8'))
             self.process.communicate()
@@ -80,6 +86,7 @@ class Command(object):
         if thread.is_alive():
             print ('Terminating process')
             self.process.terminate()
+            error()
             os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
             os.kill(os.getpid(self.process.pid), signal.SIGTERM)
             thread.join()
@@ -97,11 +104,12 @@ s3_client = boto3.client('s3',
                           aws_secret_access_key=aws_secret_access_key )
 
 
-cmd_str = "docker pull {}".format(container)
+cmd_str = ("docker pull {}".format(container))
+cmd_str = cmd_str.split()
 print ("\nLaunching: {}".format(cmd_str))
 command = Command(cmd_str)
 threads = []
-output = command.run(timeout=50)
+output = command.run(timeout=10, shell=False)
 print ("Return code: {}".format(output[0]))
 print ("Output:\n {}".format(output[1]))
 #print (output[0])
@@ -111,34 +119,31 @@ print ("Output:\n {}".format(output[1]))
 s3_bucket = 's3-kingston-yd-test01'
 #s3_object_key = 'application.yaml'
 
-s3_file_list = files_to_download.split(",")
-for s3_file_name in s3_file_list:
+for s3_file_name in files_to_download:
     #download(s3_file_name, s3_bucket, s3_object_key)
     download(s3_file_name, s3_bucket, s3_file_name)
     shutil.copy(s3_file_name, "/var/opt/yellowdog/agent/mnt")
 
 # Copy file for into volume mount directory for container
-# shutil.copy(local_file_name, "/var/opt/yellowdog/agent/mnt")
+#shutil.copy(local_file_name, "/var/opt/yellowdog/agent/mnt")
 
-
-cmd_str = "docker run --rm -v /var/opt/yellowdog/agent/mnt:/mnt {} {} | tee -a /var/opt/yellowdog/agent/output1.txt".format(container, container_args)
+#cmd_str = ("docker run --rm -v /var/opt/yellowdog/agent/mnt:/mnt {} {} | tee -a /var/opt/yellowdog/agent/output1.txt".format(container, container_args))
+cmd_str = ("docker run --rm -v /var/opt/yellowdog/agent/mnt:/mnt {} {}".format(container, container_args))
+cmd_str = cmd_str.split()
 print ("\nLaunching: {}".format(cmd_str))
 command = Command(cmd_str)
 threads = []
-output = command.run(timeout=1)
+output = command.run(timeout=15, shell=False)
 print ("Return code: {}".format(output[0]))
 print ("Output:\n {}".format(output[1]))
 
 print ("\nUploading results back to S3 bucket")
-local_file_list = files_to_upload.split(",")
-for file_name in local_file_list:
-    upload(file_name, s3_bucket, file_name)
-
-#local_file_name = '/var/opt/yellowdog/agent/output1.txt'
+#local_file_name = '/mnt/output1.txt'
 #s3_bucket = 's3-kingston-yd-test01'
 #s3_object_key = 'output1.txt'
 
-#upload(local_file_name, s3_bucket, s3_object_key)
+for local_file_name in files_to_upload:
+    upload(local_file_name, s3_bucket, local_file_name)
 
 sys.exit(0)
 
