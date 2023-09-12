@@ -111,7 +111,8 @@ print ("Output:\n {}".format(output[1]))
 s3_bucket = 's3-kingston-yd-test01'
 #s3_object_key = 'application.yaml'
 
-for s3_file_name in files_to_download:
+s3_file_list = files_to_download.split(",")
+for s3_file_name in s3_file_list:
     #download(s3_file_name, s3_bucket, s3_object_key)
     download(s3_file_name, s3_bucket, s3_file_name)
     shutil.copy(s3_file_name, "/var/opt/yellowdog/agent/mnt")
