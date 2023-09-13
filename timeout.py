@@ -130,11 +130,11 @@ for s3_file_name in s3_file_list:
 
 #cmd_str = ("docker run --rm -v /var/opt/yellowdog/agent/mnt:/mnt {} {} | tee -a /var/opt/yellowdog/agent/output1.txt".format(container, container_args))
 cmd_str = ("docker run --rm -v /var/opt/yellowdog/agent/mnt:/mnt {} {}".format(container, container_args))
-#cmd_str = cmd_str.split()
+cmd_str = cmd_str.split()
 print ("\nLaunching: {}".format(cmd_str))
 command = Command(cmd_str)
 threads = []
-output = command.run(timeout=172800, shell=True)
+output = command.run(timeout=172800, shell=False)
 print ("Return code: {}".format(output[0]))
 print ("Output:\n {}".format(output[1]))
 
@@ -145,7 +145,7 @@ print ("\nUploading results back to S3 bucket")
 
 local_file_list = files_to_upload.split(",")
 for local_file_name in local_file_list:
-    abs_local_file_name = "/mnt/{}".format(local_file_name)
+    abs_local_file_name = ("/mnt/{}".format(local_file_name))
     upload(abs_local_file_name, s3_bucket, local_file_name)
 
 sys.exit(0)
