@@ -145,7 +145,7 @@ print ("\nUploading results back to S3 bucket")
 
 local_file_list = files_to_upload.split(",")
 for local_file_name in local_file_list:
-    abs_local_file_name = ("/mnt/{}".format(local_file_name))
+    abs_local_file_name = ("/var/opt/yellowdog/agent/mnt/{}".format(local_file_name))
     upload(abs_local_file_name, s3_bucket, local_file_name)
 
 sys.exit(0)
