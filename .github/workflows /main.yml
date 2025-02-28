@@ -38,23 +38,24 @@
 # 3. Reference the GitHub secret in step using the `hashicorp/setup-terraform` GitHub Action.
 #   Example:
 #     - name: Setup Terraform
-#       uses: hashicorp/setup-terraform@v1
+#       uses: hashicorp/setup-terraform@v1# Controls when the workflow will run
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+  # to trigger workflow on code push
+  push:
+    branches:
+      - main
+
+  # to trigger workflow on PRs
+  pull_request:
+    branches:
+      - main
 #       with:
 #         cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
 name: 'Terraform'
-
-on: 
-  push: 
-    branches:
-    - main
-    paths:
-    - terraform/**
-  pull_request:
-    branches:
-    - main
-    paths:
-    - terraform/**
 
 jobs:
   terraform:
