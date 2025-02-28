@@ -40,6 +40,7 @@ jobs:
       run: cd yd; terraform init
 
   terraform-plan:
+    needs: [terraform-init]
     # The type of runner that the job will run on
     runs-on: self-hosted
     defaults:
