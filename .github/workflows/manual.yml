@@ -36,3 +36,5 @@ jobs:
       run: git clone https://github.com/intamixx/yd/
     - name: run hello
       run: echo "Hello ${{ inputs.name }}"
+    - name: terraform init
+      run: cd yd; terraform init
