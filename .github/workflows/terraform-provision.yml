@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
 
   # to trigger workflow on code push
-  push:
-    branches:
-      - main
+  #push:
+  #  branches:
+  #    - main
 
   # to trigger workflow on PRs
   pull_request:
@@ -22,7 +22,7 @@ on:
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a single job called "greet"
-  terraform-init:
+  provision-terraform-init:
     # The type of runner that the job will run on
     runs-on: self-hosted
     defaults:
@@ -39,7 +39,7 @@ jobs:
     - name: terraform init
       run: cd yd/terraform-provision; terraform init
 
-  terraform-plan:
+  provision-terraform-plan:
     needs: [terraform-init]
     # The type of runner that the job will run on
     runs-on: self-hosted
@@ -60,7 +60,7 @@ jobs:
       run: terraform plan
       continue-on-error: true
 
-  terraform-apply:
+  provision-terraform-apply:
     needs: [terraform-init, terraform-plan]
     # The type of runner that the job will run on
     runs-on: self-hosted
@@ -75,7 +75,7 @@ jobs:
       run: terraform apply -auto-approve -input=false
       continue-on-error: true
 
-  create-node-list:
+  provision-create-node-list:
     needs: [terraform-init, terraform-plan, terraform-apply]
     # The type of runner that the job will run on
     runs-on: self-hosted
