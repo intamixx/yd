@@ -40,7 +40,7 @@ jobs:
       run: cd yd/terraform-provision; terraform init
 
   provision-terraform-plan:
-    needs: [terraform-init]
+    needs: [provision-terraform-init]
     # The type of runner that the job will run on
     runs-on: self-hosted
     defaults:
@@ -61,7 +61,7 @@ jobs:
       continue-on-error: true
 
   provision-terraform-apply:
-    needs: [terraform-init, terraform-plan]
+    needs: [provision-terraform-init, provision-terraform-plan]
     # The type of runner that the job will run on
     runs-on: self-hosted
     defaults:
