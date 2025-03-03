@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
 
   # to trigger workflow on code push
-  push:
-    branches:
-      - main
+  #push:
+  #  branches:
+  #    - main
 
   # to trigger workflow on PRs
   pull_request:
@@ -22,7 +22,7 @@ on:
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a single job
-  terraform-init:
+  rke-terraform-init:
     # The type of runner that the job will run on
     runs-on: self-hosted
     defaults:
@@ -37,7 +37,7 @@ jobs:
     - name: terraform init
       run: terraform init
 
-  terraform-plan:
+  rke-terraform-plan:
     needs: [terraform-init]
     # The type of runner that the job will run on
     runs-on: self-hosted
@@ -58,7 +58,7 @@ jobs:
       run: terraform plan
       continue-on-error: true
 
-  terraform-apply:
+  rke-terraform-apply:
     needs: [terraform-init, terraform-plan]
     # The type of runner that the job will run on
     runs-on: self-hosted
@@ -73,7 +73,7 @@ jobs:
       run: terraform apply -auto-approve -input=false
       continue-on-error: true
 
-  get-ca-cert:
+  rke-get-ca-cert:
     needs: [terraform-init, terraform-plan, terraform-apply]
     # The type of runner that the job will run on
     runs-on: self-hosted
