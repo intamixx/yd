@@ -85,4 +85,4 @@ jobs:
     steps:
     - name: get-ca-cert
       id: get-ca-cert
-      run: get_ca_cert.sh >> ../terraform-grafana/terraform.tfvars
+      run: /bin/bash ./get_ca_cert.sh >> ../terraform-grafana/terraform.tfvars
