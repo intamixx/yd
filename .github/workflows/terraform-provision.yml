@@ -37,7 +37,7 @@ jobs:
     - name: run hello
       run: echo "Hello ${{ inputs.name }}"
     - name: terraform init
-      run: terraform init
+      run: cd terraform-provision; terraform init
 
   terraform-plan:
     needs: [terraform-init]
