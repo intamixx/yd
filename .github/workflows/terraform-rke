@@ -73,8 +73,8 @@ jobs:
       run: terraform apply -auto-approve -input=false
       continue-on-error: true
 
-  get-ca-cert.sh:
-    needs: [terraform-init, terraform-plan]
+  get-ca-cert:
+    needs: [terraform-init, terraform-plan, terraform-apply]
     # The type of runner that the job will run on
     runs-on: self-hosted
     defaults:
@@ -83,6 +83,6 @@ jobs:
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-    - name: Terraform apply
-      id: apply
+    - name: get-ca-cert
+      id: get-ca-cert
       run: get_ca_cert.sh >> ../terraform-kueue/terraform.tfvars
