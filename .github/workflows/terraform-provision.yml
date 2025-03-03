@@ -87,10 +87,10 @@ jobs:
     steps:
     - name: Create node list kueue
       id: create-nodes-kueue
-      run: ./create_terraform_nodes_list.sh >> ../terraform-kueue/terraform.tfvars
+      run: /bin/bash ./create_terraform_nodes_list.sh >> ../terraform-kueue/terraform.tfvars
     - name: Create node list rke
       id: create-nodes-rke
-      run: ./create_terraform_nodes_list.sh >> ../terraform-rke/terraform.tfvars
+      run: /bin/bash ./create_terraform_nodes_list.sh >> ../terraform-rke/terraform.tfvars
     - name: Create node list grafana
       id: create-nodes-grafana
-      run: ./create_terraform_nodes_list.sh >> ../terraform-grafana/terraform.tfvars
+      run: /bin/bash ./create_terraform_nodes_list.sh >> ../terraform-grafana/terraform.tfvars
