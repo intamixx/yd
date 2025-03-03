@@ -74,7 +74,7 @@ jobs:
       continue-on-error: true
 
   rke-get-ca-cert:
-    needs: [terraform-init, terraform-plan, terraform-apply]
+    needs: [rke-terraform-init, rke-terraform-plan, rke-terraform-apply]
     # The type of runner that the job will run on
     runs-on: self-hosted
     defaults:
