@@ -76,7 +76,7 @@ jobs:
       continue-on-error: true
 
   provision-create-node-list:
-    needs: [terraform-init, terraform-plan, terraform-apply]
+    needs: [provision-terraform-init, provision-terraform-plan, provision-terraform-apply]
     # The type of runner that the job will run on
     runs-on: self-hosted
     defaults:
