@@ -56,7 +56,7 @@ jobs:
     - name: terraform plan
       id: plan
       run: terraform plan
-      continue-on-error: true
+      continue-on-error: false
 
   grafana-terraform-apply:
     needs: [grafana-terraform-init, grafana-terraform-plan]
@@ -71,4 +71,4 @@ jobs:
     - name: Terraform apply
       id: apply
       run: terraform apply -auto-approve -input=false
-      continue-on-error: true
+      continue-on-error: false
