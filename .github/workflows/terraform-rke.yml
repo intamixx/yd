@@ -56,7 +56,7 @@ jobs:
     - name: terraform plan
       id: plan
       run: terraform plan
-      continue-on-error: true
+      continue-on-error: false
 
   rke-terraform-apply:
     needs: [rke-terraform-init, rke-terraform-plan]
@@ -71,7 +71,7 @@ jobs:
     - name: Terraform apply
       id: apply
       run: terraform apply -auto-approve -input=false
-      continue-on-error: true
+      continue-on-error: false
 
   rke-get-ca-cert:
     needs: [rke-terraform-init, rke-terraform-plan, rke-terraform-apply]
