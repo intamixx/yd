@@ -56,7 +56,7 @@ jobs:
     - name: terraform plan
       id: plan
       run: terraform plan
-      continue-on-error: true
+      continue-on-error: false
 
   kueue-terraform-apply:
     needs: [kueue-terraform-init, kueue-terraform-plan]
@@ -71,7 +71,7 @@ jobs:
     - name: Terraform apply
       id: apply
       run: terraform apply -auto-approve -input=false
-      continue-on-error: true
+      continue-on-error: false
 
   kueue-get-token:
     needs: [kueue-terraform-init, kueue-terraform-plan, kueue-terraform-apply]
