@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: matnn
+    #  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: matnn
+  template:
+    metadata:
+      labels:
+        app: matnn
+    spec:
+      containers:
+      - name: matnn
+        image: intamixx/matnn_v3:latest
+        ports:
+        - name: nodejs
+          containerPort: 8090
+        - name: vitejs
+          containerPort: 9090
+        - name: fastapi
+          containerPort: 8000
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: config-volume
+          mountPath: /fastapi/config
+        - name: ssl-volume
+          mountPath: /nodejs/ssl
+        - name: nfs
+          mountPath: /mnt
+        livenessProbe:
+          httpGet:
+            path: /upload
+            port: 9090
+          initialDelaySeconds: 30
+          periodSeconds: 300
+          successThreshold: 1
+          failureThreshold: 3
+          timeoutSeconds: 1
+        readinessProbe:
+          httpGet:
+            path: /upload
+            port: 9090
+          initialDelaySeconds: 30
+          periodSeconds: 300
+          successThreshold: 1
+          failureThreshold: 3
+          timeoutSeconds: 1
+      volumes:
+      - name: config-volume
+        configMap:
+          name: matnn-config
+          items:
+            - key: matnn-config
+              path: matnn.ini
+      - name: ssl-volume
+        configMap:
+          name: matnn-config
+          items:
+            - key: ssl-privatekey
+              path: privatekey.pem
+            - key: ssl-certificate
+              path: certificate.pem
+      - name: nfs
+        persistentVolumeClaim:
+          #claimName: nfs-claim
+          claimName: pvc-rwx
+      restartPolicy: Always
