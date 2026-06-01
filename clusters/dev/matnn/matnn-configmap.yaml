@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: matnn-config
-  #namespace: default
+  namespace: default
 data:
   matnn-config: |
     [nfs-server]
