@@ -4,4 +4,4 @@ metadata:
   name: matnn
   namespace: default
 spec:
-  replicas: 2
+  replicas: 3
