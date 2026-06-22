@@ -53,3 +53,13 @@ spec:
             name: nginx-rwx-service
             port:
               number: 80
+  - host: longhorn.matnn-app.intamixx.uk  # Longhorn hostname
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: longhorn-frontend
+            port:
+              number: 80
