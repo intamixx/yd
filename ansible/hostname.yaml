@@ -1,0 +1,14 @@
+---
+- hosts: all
+  gather_facts: false
+  tasks:
+    - name: Ping test
+      ping:
+
+    - name: Verify SSH connection
+      shell: hostname
+      register: hostname_output
+
+    - name: Display hostname
+      debug:
+        var: hostname_output
