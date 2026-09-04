@@ -16,3 +16,16 @@
     - name: Show VMware result
       ansible.builtin.debug:
         var: vmware_test
+
+    - name: Get vCenter information
+      community.vmware.vmware_about_info:
+        hostname: "192.168.0.195"
+        port: 8989
+        username: "user"
+        password: "pass"
+        validate_certs: false
+      register: vcenter_info
+
+    - name: Display vCenter information
+      ansible.builtin.debug:
+        var: vcenter_info
