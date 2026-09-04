@@ -1,0 +1,1112 @@
+---
+- name: Validate SCCM PR-8 PR-9 PR-10 PR-11 PR-12 PR-13 PR-14
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+
+    # ========================================================
+    # VCENTER
+    # ========================================================
+
+    vcenter_hostname: "192.168.0.195"
+    vcenter_username: "user"
+    vcenter_password: "pass"
+    vcenter_port: 8989
+
+    datacenter_name: "DC0"
+
+
+    # ========================================================
+    # PR-8
+    #
+    # Production Cluster 1
+    #
+    # hrp-wld2-cluster1
+    #   SCCOPS001-AP1
+    #     BGB01AP1519
+    # ========================================================
+
+    pr8:
+      cluster: "hrp-wld2-cluster1"
+      resource_pool: "SCCOPS001-AP1"
+      vms:
+        - "BGB01AP1519"
+
+
+    # ========================================================
+    # PR-9
+    #
+    # Production Cluster 1
+    #
+    # VM Group:
+    #   SCCOPS001-GP1
+    #
+    # Host Group:
+    #   Cluster1-AZ1-Host
+    #
+    # Rule:
+    #   SCCOPS001-HA1
+    #   SHOULD RUN
+    # ========================================================
+
+    pr9:
+      cluster: "hrp-wld2-cluster1"
+
+      vm_group: "SCCOPS001-GP1"
+
+      vm:
+        - "BGB01AP1519"
+
+      host_group: "Cluster1-AZ1-Host"
+
+      hosts:
+        - "DC0_C1_H0"
+        - "DC0_C1_H1"
+
+      rule: "SCCOPS001-HA1"
+
+
+    # ========================================================
+    # PR-10
+    #
+    # Cluster 2
+    #
+    # hrp-wld2-cluster2-az1
+    #   SCCOPS001-AP2
+    #     BDC02AP1001
+    #     BDC02CN1001
+    # ========================================================
+
+    pr10:
+      cluster: "hrp-wld2-cluster2-az1"
+      resource_pool: "SCCOPS001-AP2"
+
+      vms:
+        - "BDC02AP1001"
+        - "BDC02CN1001"
+
+
+    # ========================================================
+    # PR-11
+    #
+    # Cluster 3
+    #
+    # hrp-wld2-cluster3-az2
+    #
+    # Following the PR-11 requirement as originally supplied:
+    # SCCOPS001-AP2
+    #
+    # If FB-6 is authoritative instead, change AP2 to AP3.
+    # ========================================================
+
+    pr11:
+      cluster: "hrp-wld2-cluster3-az2"
+      resource_pool: "SCCOPS001-AP2"
+
+      vms:
+        - "BDC03AP1001"
+        - "BDC03CN1001"
+
+
+    # ========================================================
+    # PR-12
+    #
+    # BCDR Cluster
+    #
+    # hrp-wld2-cluster4-dr1
+    #   SCCOPS001-AP4
+    # ========================================================
+
+    pr12:
+      cluster: "hrp-wld2-cluster4-dr1"
+      resource_pool: "SCCOPS001-AP4"
+
+
+    # ========================================================
+    # PR-13
+    #
+    # BCDR Cluster
+    #
+    # VM Group:
+    #   SCCOPS001-GP1
+    #
+    # Host Group:
+    #   Cluster4-AZ1-Host
+    #
+    # Rule:
+    #   SCCOPS001-HA1
+    #   SHOULD RUN
+    # ========================================================
+
+    pr13:
+      cluster: "hrp-wld2-cluster4-dr1"
+
+      vm_group: "SCCOPS001-GP1"
+
+      vm:
+        - "BGB01AP1519"
+
+      host_group: "Cluster4-AZ1-Host"
+
+      hosts:
+        - "DC0_C0_H0"
+        - "DC0_C0_H1"
+
+      rule: "SCCOPS001-HA1"
+
+
+    # ========================================================
+    # PR-14
+    #
+    # BCDR Cluster
+    #
+    # VM Group:
+    #   Cluster4-AZ1-VM
+    #
+    # Host Group:
+    #   Cluster4-AZ1-Host
+    #
+    # Rule:
+    #   Cluster4-AZ1-VM
+    #   MUST RUN
+    # ========================================================
+
+    pr14:
+      cluster: "hrp-wld2-cluster4-dr1"
+
+      vm_group: "Cluster4-AZ1-VM"
+
+      vms:
+        - "BDC02AP1001"
+        - "BDC02CN1001"
+
+      host_group: "Cluster4-AZ1-Host"
+
+      rule: "Cluster4-AZ1-VM"
+
+
+  tasks:
+
+    # ========================================================
+    # VM INVENTORY
+    # ========================================================
+
+    - name: Gather VMware VM inventory
+      community.vmware.vmware_vm_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        port: "{{ vcenter_port }}"
+        validate_certs: false
+      register: vm_info
+      delegate_to: localhost
+
+
+    # ========================================================
+    # RESOURCE POOL INFORMATION
+    # ========================================================
+
+    - name: Gather VMware resource pool information
+      community.vmware.vmware_resource_pool_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        port: "{{ vcenter_port }}"
+        validate_certs: false
+      register: resource_pool_info
+      delegate_to: localhost
+
+
+    # ========================================================
+    # DRS GROUPS
+    #
+    # IMPORTANT:
+    # cluster_name and datacenter are mutually exclusive in
+    # your installed community.vmware collection.
+    #
+    # Therefore cluster_name is used by itself.
+    # ========================================================
+
+    - name: Gather DRS groups - PR-9 production cluster
+      community.vmware.vmware_drs_group_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        port: "{{ vcenter_port }}"
+        cluster_name: "{{ pr9.cluster }}"
+        validate_certs: false
+      register: pr9_group_info
+      delegate_to: localhost
+
+
+    - name: Gather DRS groups - PR-13 and PR-14 BCDR cluster
+      community.vmware.vmware_drs_group_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        port: "{{ vcenter_port }}"
+        cluster_name: "{{ pr13.cluster }}"
+        validate_certs: false
+      register: bcdr_group_info
+      delegate_to: localhost
+
+
+    # ========================================================
+    # DRS RULES
+    # ========================================================
+
+    - name: Gather DRS rules - PR-9 production cluster
+      community.vmware.vmware_drs_rule_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        port: "{{ vcenter_port }}"
+        cluster_name: "{{ pr9.cluster }}"
+        validate_certs: false
+      register: pr9_rule_info
+      delegate_to: localhost
+
+
+    - name: Gather DRS rules - PR-13 and PR-14 BCDR cluster
+      community.vmware.vmware_drs_rule_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        port: "{{ vcenter_port }}"
+        cluster_name: "{{ pr13.cluster }}"
+        validate_certs: false
+      register: bcdr_rule_info
+      delegate_to: localhost
+
+
+    # ========================================================
+    # DEBUG - SHOW ACTUAL MODULE RESULTS
+    #
+    # Keep these for the first run. They let us verify exactly
+    # what your installed collection returns.
+    # ========================================================
+
+    - name: Show production DRS groups
+      ansible.builtin.debug:
+        var: pr9_group_info.drs_group_info
+
+
+    - name: Show production DRS rules
+      ansible.builtin.debug:
+        var: pr9_rule_info.drs_rule_info
+
+
+    - name: Show BCDR DRS groups
+      ansible.builtin.debug:
+        var: bcdr_group_info.drs_group_info
+
+
+    - name: Show BCDR DRS rules
+      ansible.builtin.debug:
+        var: bcdr_rule_info.drs_rule_info
+
+    # ========================================================
+    # DEBUG VM PLACEMENT
+    # ========================================================
+
+        #    - name: "PR-8 - List VM placement information"
+        #      ansible.builtin.debug:
+        #        msg:
+        #          vm: "{{ item.key }}"
+        #          cluster: "{{ item.value.cluster | default('N/A') }}"
+        #          resource_pool: "{{ item.value.resource_pool | default('N/A') }}"
+        #          resource_group: "{{ item.value.resource_group | default('N/A') }}"
+        #          host: "{{ item.value.host | default('N/A') }}"
+        #          datacenter: "{{ item.value.datacenter | default('N/A') }}"
+        #          datastore: "{{ item.value.datastore | default('N/A') }}"
+        #      loop: "{{ vm_by_name | dict2items }}"
+        #      loop_control:
+        #        label: "{{ item.key }}"
+
+    # ========================================================
+    # BUILD VM LOOKUP
+    # ========================================================
+
+    - name: Build VM lookup by guest name
+      ansible.builtin.set_fact:
+        vm_by_name: >-
+          {{
+            dict(
+              vm_info.virtual_machines
+              | map(attribute='guest_name')
+              | zip(vm_info.virtual_machines)
+            )
+          }}
+
+
+    # ========================================================
+    # BUILD RESOURCE POOL LOOKUP
+    # ========================================================
+
+    - name: Build resource pool lookup
+      ansible.builtin.set_fact:
+        resource_pool_by_name: >-
+          {{
+            dict(
+              resource_pool_info.resource_pool_info
+              | map(attribute='name')
+              | zip(resource_pool_info.resource_pool_info)
+            )
+          }}
+
+    - name: "PR-8 - Dump all VM objects"
+      ansible.builtin.debug:
+        var: item
+      loop: "{{ vm_info.virtual_machines }}"
+      loop_control:
+        label: "{{ item.guest_name | default('unknown') }}"
+
+    # ========================================================
+    # PR-8
+    # ========================================================
+
+    - name: "PR-8 - Check VM exists"
+      ansible.builtin.assert:
+        that:
+          - item in vm_by_name
+        fail_msg: >-
+          PR-8 FAIL:
+          VM '{{ item }}' does not exist.
+        success_msg: >-
+          PR-8 PASS:
+          VM '{{ item }}' exists.
+      loop: "{{ pr8.vms }}"
+      loop_control:
+        label: "{{ item }}"
+
+        #    - name: "PR-8 - List all found VMs"
+        #      ansible.builtin.debug:
+        #        msg: "{{ vm_by_name.keys() | list | sort }}"
+
+    - name: "PR-8 - List all found VMs"
+      ansible.builtin.debug:
+        msg:
+          vm: "{{ item.key }}"
+          cluster: "{{ item.value.cluster | default('N/A') }}"
+          group: "{{ item.value.group | default('N/A') }}"
+          resource_pool: "{{ item.value.resource_pool | default('N/A') }}"
+      loop: "{{ vm_by_name | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+        #    - name: "PR-8 - Check cluster"
+        #      ansible.builtin.assert:
+        #        that:
+        #          - vm_by_name[item].cluster == pr8.cluster
+        #        fail_msg: >-
+        #          PR-8 FAIL:
+        #          {{ item }} is in cluster
+        #          '{{ vm_by_name[item].cluster }}',
+        #          expected '{{ pr8.cluster }}'.
+        #        success_msg: >-
+        #          PR-8 PASS:
+        #          {{ item }} is in {{ pr8.cluster }}.
+        #      loop: "{{ pr8.vms }}"
+        #      loop_control:
+        #        label: "{{ item }}"
+
+    - name: "PR-8 - Find matching VM"
+      ansible.builtin.set_fact:
+        matching_vms: >-
+          {{
+            vm_info.virtual_machines
+            | selectattr('guest_name', 'equalto', item)
+            | selectattr('cluster', 'equalto', pr8.cluster)
+            | selectattr('resource_pool', 'equalto', pr8.resource_pool)
+            | list
+          }}
+      loop: "{{ pr8.vms }}"
+
+    - name: "PR-8 - Check VM placement"
+      ansible.builtin.assert:
+        that:
+          - matching_vms | length == 1
+        fail_msg: >-
+          PR-8 FAIL: {{ item }} has {{ matching_vms | length }}
+          matching VM objects for cluster '{{ pr8.cluster }}'
+          and resource pool '{{ pr8.resource_pool }}'.
+        success_msg: >-
+          PR-8 PASS: {{ item }} found in
+          '{{ pr8.cluster }}/{{ pr8.resource_pool }}'.
+      loop: "{{ pr8.vms }}"
+
+      #    - name: "PR-8 - Check resource pool association"
+      #      ansible.builtin.assert:
+      #        that:
+      #          - vm_by_name[item].resource_pool == pr8.resource_pool
+      #        fail_msg: >-
+      #          PR-8 FAIL:
+      #          {{ item }} is in resource pool
+      #          '{{ vm_by_name[item].resource_pool }}',
+      #          expected '{{ pr8.resource_pool }}'.
+      #        success_msg: >-
+      #          PR-8 PASS:
+      #          {{ item }} is in {{ pr8.resource_pool }}.
+      #      loop: "{{ pr8.vms }}"
+      #      loop_control:
+      #        label: "{{ item }}"
+
+
+    - name: "PR-8 - Check resource pool exists"
+      ansible.builtin.assert:
+        that:
+          - pr8.resource_pool in resource_pool_by_name
+        fail_msg: >-
+          PR-8 FAIL:
+          resource pool '{{ pr8.resource_pool }}' does not exist.
+        success_msg: >-
+          PR-8 PASS:
+          resource pool '{{ pr8.resource_pool }}' exists.
+
+
+    # ========================================================
+    # PR-9
+    # ========================================================
+
+    - name: "PR-9 - Extract production groups"
+      ansible.builtin.set_fact:
+        pr9_groups: >-
+          {{
+            pr9_group_info.drs_group_info[pr9.cluster]
+            | default([])
+          }}
+
+
+    - name: "PR-9 - Extract production rules"
+      ansible.builtin.set_fact:
+        pr9_rules: >-
+          {{
+            pr9_rule_info.drs_rule_info[pr9.cluster]
+            | default([])
+          }}
+
+
+    # --------------------------------------------------------
+    # VM GROUP
+    # --------------------------------------------------------
+
+    - name: "PR-9 - Locate VM group"
+      ansible.builtin.set_fact:
+        pr9_vm_group_data: >-
+          {{
+            pr9_groups
+            | selectattr('type', 'equalto', 'vm')
+            | selectattr('group_name', 'equalto', pr9.vm_group)
+            | list
+          }}
+
+
+    - name: "PR-9 - VM group exists"
+      ansible.builtin.assert:
+        that:
+          - pr9_vm_group_data | length == 1
+        fail_msg: >-
+          PR-9 FAIL:
+          VM group '{{ pr9.vm_group }}' not found.
+        success_msg: >-
+          PR-9 PASS:
+          VM group '{{ pr9.vm_group }}' exists.
+
+
+    - name: "PR-9 - VM group membership"
+      ansible.builtin.assert:
+        that:
+          - pr9.vm | difference(pr9_vm_group_data[0].vms | default([])) | length == 0
+        fail_msg: >-
+          PR-9 FAIL:
+          expected {{ pr9.vm }} in {{ pr9.vm_group }},
+          actual:
+          {{ pr9_vm_group_data[0].vms | default([]) }}.
+        success_msg: >-
+          PR-9 PASS:
+          {{ pr9.vm_group }} contains {{ pr9.vm }}.
+
+
+    # --------------------------------------------------------
+    # HOST GROUP
+    # --------------------------------------------------------
+
+    - name: "PR-9 - Locate host group"
+      ansible.builtin.set_fact:
+        pr9_host_group_data: >-
+          {{
+            pr9_groups
+            | selectattr('type', 'equalto', 'host')
+            | selectattr('group_name', 'equalto', pr9.host_group)
+            | list
+          }}
+
+
+    - name: "PR-9 - Host group exists"
+      ansible.builtin.assert:
+        that:
+          - pr9_host_group_data | length == 1
+        fail_msg: >-
+          PR-9 FAIL:
+          host group '{{ pr9.host_group }}' not found.
+        success_msg: >-
+          PR-9 PASS:
+          host group '{{ pr9.host_group }}' exists.
+
+
+    - name: "PR-9 - Host group membership"
+      ansible.builtin.assert:
+        that:
+          - pr9.hosts | difference(pr9_host_group_data[0].hosts | default([])) | length == 0
+        fail_msg: >-
+          PR-9 FAIL:
+          expected hosts {{ pr9.hosts }},
+          actual:
+          {{ pr9_host_group_data[0].hosts | default([]) }}.
+        success_msg: >-
+          PR-9 PASS:
+          {{ pr9.host_group }} contains expected hosts.
+
+
+    # --------------------------------------------------------
+    # RULE
+    # --------------------------------------------------------
+
+    - name: "PR-9 - Locate HA rule"
+      ansible.builtin.set_fact:
+        pr9_rule_data: >-
+          {{
+            pr9_rules
+            | selectattr('rule_name', 'equalto', pr9.rule)
+            | list
+          }}
+
+
+    - name: "PR-9 - Rule exists"
+      ansible.builtin.assert:
+        that:
+          - pr9_rule_data | length == 1
+        fail_msg: >-
+          PR-9 FAIL:
+          rule '{{ pr9.rule }}' not found.
+        success_msg: >-
+          PR-9 PASS:
+          rule '{{ pr9.rule }}' exists.
+
+
+    - name: "PR-9 - Rule enabled"
+      ansible.builtin.assert:
+        that:
+          - pr9_rule_data[0].rule_enabled | bool
+        fail_msg: >-
+          PR-9 FAIL:
+          rule '{{ pr9.rule }}' is disabled.
+        success_msg: >-
+          PR-9 PASS:
+          rule '{{ pr9.rule }}' is enabled.
+
+
+    - name: "PR-9 - Rule is SHOULD RUN"
+      ansible.builtin.assert:
+        that:
+          - not (pr9_rule_data[0].rule_mandatory | bool)
+        fail_msg: >-
+          PR-9 FAIL:
+          rule '{{ pr9.rule }}' is MUST RUN,
+          expected SHOULD RUN.
+        success_msg: >-
+          PR-9 PASS:
+          rule '{{ pr9.rule }}' is SHOULD RUN.
+
+
+    - name: "PR-9 - Rule references correct VM group"
+      ansible.builtin.assert:
+        that:
+          - pr9_rule_data[0].rule_vm_group_name == pr9.vm_group
+        fail_msg: >-
+          PR-9 FAIL:
+          rule VM group is
+          '{{ pr9_rule_data[0].rule_vm_group_name }}',
+          expected '{{ pr9.vm_group }}'.
+        success_msg: >-
+          PR-9 PASS:
+          rule references {{ pr9.vm_group }}.
+
+
+    - name: "PR-9 - Rule references correct host group"
+      ansible.builtin.assert:
+        that:
+          - pr9_rule_data[0].rule_affine_host_group_name == pr9.host_group
+        fail_msg: >-
+          PR-9 FAIL:
+          rule host group is
+          '{{ pr9_rule_data[0].rule_affine_host_group_name }}',
+          expected '{{ pr9.host_group }}'.
+        success_msg: >-
+          PR-9 PASS:
+          rule references {{ pr9.host_group }}.
+
+
+    # ========================================================
+    # PR-10
+    # ========================================================
+
+    - name: "PR-10 - Check VMs exist"
+      ansible.builtin.assert:
+        that:
+          - item in vm_by_name
+        fail_msg: >-
+          PR-10 FAIL:
+          VM '{{ item }}' does not exist.
+        success_msg: >-
+          PR-10 PASS:
+          VM '{{ item }}' exists.
+      loop: "{{ pr10.vms }}"
+      loop_control:
+        label: "{{ item }}"
+
+
+    - name: "PR-10 - Check cluster"
+      ansible.builtin.assert:
+        that:
+          - vm_by_name[item].cluster == pr10.cluster
+        fail_msg: >-
+          PR-10 FAIL:
+          {{ item }} is in cluster
+          '{{ vm_by_name[item].cluster }}',
+          expected '{{ pr10.cluster }}'.
+        success_msg: >-
+          PR-10 PASS:
+          {{ item }} is in {{ pr10.cluster }}.
+      loop: "{{ pr10.vms }}"
+      loop_control:
+        label: "{{ item }}"
+
+
+    - name: "PR-10 - Check resource pool"
+      ansible.builtin.assert:
+        that:
+          - vm_by_name[item].resource_pool == pr10.resource_pool
+        fail_msg: >-
+          PR-10 FAIL:
+          {{ item }} is in resource pool
+          '{{ vm_by_name[item].resource_pool }}',
+          expected '{{ pr10.resource_pool }}'.
+        success_msg: >-
+          PR-10 PASS:
+          {{ item }} is in {{ pr10.resource_pool }}.
+      loop: "{{ pr10.vms }}"
+      loop_control:
+        label: "{{ item }}"
+
+
+    - name: "PR-10 - Check resource pool exists"
+      ansible.builtin.assert:
+        that:
+          - pr10.resource_pool in resource_pool_by_name
+        fail_msg: >-
+          PR-10 FAIL:
+          resource pool '{{ pr10.resource_pool }}' does not exist.
+        success_msg: >-
+          PR-10 PASS:
+          resource pool '{{ pr10.resource_pool }}' exists.
+
+
+    # ========================================================
+    # PR-11
+    # ========================================================
+
+    - name: "PR-11 - Check VMs exist"
+      ansible.builtin.assert:
+        that:
+          - item in vm_by_name
+        fail_msg: >-
+          PR-11 FAIL:
+          VM '{{ item }}' does not exist.
+        success_msg: >-
+          PR-11 PASS:
+          VM '{{ item }}' exists.
+      loop: "{{ pr11.vms }}"
+      loop_control:
+        label: "{{ item }}"
+
+
+    - name: "PR-11 - Check cluster"
+      ansible.builtin.assert:
+        that:
+          - vm_by_name[item].cluster == pr11.cluster
+        fail_msg: >-
+          PR-11 FAIL:
+          {{ item }} is in cluster
+          '{{ vm_by_name[item].cluster }}',
+          expected '{{ pr11.cluster }}'.
+        success_msg: >-
+          PR-11 PASS:
+          {{ item }} is in {{ pr11.cluster }}.
+      loop: "{{ pr11.vms }}"
+      loop_control:
+        label: "{{ item }}"
+
+
+    - name: "PR-11 - Check resource pool"
+      ansible.builtin.assert:
+        that:
+          - vm_by_name[item].resource_pool == pr11.resource_pool
+        fail_msg: >-
+          PR-11 FAIL:
+          {{ item }} is in resource pool
+          '{{ vm_by_name[item].resource_pool }}',
+          expected '{{ pr11.resource_pool }}'.
+        success_msg: >-
+          PR-11 PASS:
+          {{ item }} is in {{ pr11.resource_pool }}.
+      loop: "{{ pr11.vms }}"
+      loop_control:
+        label: "{{ item }}"
+
+
+    - name: "PR-11 - Check resource pool exists"
+      ansible.builtin.assert:
+        that:
+          - pr11.resource_pool in resource_pool_by_name
+        fail_msg: >-
+          PR-11 FAIL:
+          resource pool '{{ pr11.resource_pool }}' does not exist.
+        success_msg: >-
+          PR-11 PASS:
+          resource pool '{{ pr11.resource_pool }}' exists.
+
+
+    # ========================================================
+    # PR-12
+    # ========================================================
+
+    - name: "PR-12 - Check BCDR cluster VM inventory"
+      ansible.builtin.assert:
+        that:
+          - item is defined
+        success_msg: >-
+          PR-12 evaluating BCDR resource pool
+        fail_msg: >-
+          PR-12 could not evaluate BCDR resource pool
+      loop:
+        - "{{ pr12.resource_pool }}"
+
+
+    - name: "PR-12 - Check resource pool exists"
+      ansible.builtin.assert:
+        that:
+          - pr12.resource_pool in resource_pool_by_name
+        fail_msg: >-
+          PR-12 FAIL:
+          resource pool '{{ pr12.resource_pool }}' does not exist.
+        success_msg: >-
+          PR-12 PASS:
+          resource pool '{{ pr12.resource_pool }}' exists.
+
+
+    # ========================================================
+    # PR-13
+    # ========================================================
+
+    - name: "PR-13 - Locate VM group"
+      ansible.builtin.set_fact:
+        pr13_vm_group_data: >-
+          {{
+            (
+              bcdr_group_info.drs_group_info[pr13.cluster]
+              | default([])
+            )
+            | selectattr('type', 'equalto', 'vm')
+            | selectattr('group_name', 'equalto', pr13.vm_group)
+            | list
+          }}
+
+
+    - name: "PR-13 - VM group exists"
+      ansible.builtin.assert:
+        that:
+          - pr13_vm_group_data | length == 1
+        fail_msg: >-
+          PR-13 FAIL:
+          VM group '{{ pr13.vm_group }}' does not exist.
+        success_msg: >-
+          PR-13 PASS:
+          VM group '{{ pr13.vm_group }}' exists.
+
+
+    - name: "PR-13 - VM group membership"
+      ansible.builtin.assert:
+        that:
+          - pr13.vm | difference(pr13_vm_group_data[0].vms | default([])) | length == 0
+        fail_msg: >-
+          PR-13 FAIL:
+          expected {{ pr13.vm }} in {{ pr13.vm_group }},
+          actual:
+          {{ pr13_vm_group_data[0].vms | default([]) }}.
+        success_msg: >-
+          PR-13 PASS:
+          {{ pr13.vm_group }} contains {{ pr13.vm }}.
+
+
+    - name: "PR-13 - Locate host group"
+      ansible.builtin.set_fact:
+        pr13_host_group_data: >-
+          {{
+            (
+              bcdr_group_info.drs_group_info[pr13.cluster]
+              | default([])
+            )
+            | selectattr('type', 'equalto', 'host')
+            | selectattr('group_name', 'equalto', pr13.host_group)
+            | list
+          }}
+
+
+    - name: "PR-13 - Host group exists"
+      ansible.builtin.assert:
+        that:
+          - pr13_host_group_data | length == 1
+        fail_msg: >-
+          PR-13 FAIL:
+          host group '{{ pr13.host_group }}' does not exist.
+        success_msg: >-
+          PR-13 PASS:
+          host group '{{ pr13.host_group }}' exists.
+
+
+    - name: "PR-13 - Host group membership"
+      ansible.builtin.assert:
+        that:
+          - pr13.hosts | difference(pr13_host_group_data[0].hosts | default([])) | length == 0
+        fail_msg: >-
+          PR-13 FAIL:
+          expected {{ pr13.hosts }},
+          actual:
+          {{ pr13_host_group_data[0].hosts | default([]) }}.
+        success_msg: >-
+          PR-13 PASS:
+          {{ pr13.host_group }} contains expected hosts.
+
+
+    - name: "PR-13 - Locate rule"
+      ansible.builtin.set_fact:
+        pr13_rule_data: >-
+          {{
+            (
+              bcdr_rule_info.drs_rule_info[pr13.cluster]
+              | default([])
+            )
+            | selectattr('rule_name', 'equalto', pr13.rule)
+            | list
+          }}
+
+
+    - name: "PR-13 - Rule exists"
+      ansible.builtin.assert:
+        that:
+          - pr13_rule_data | length == 1
+        fail_msg: >-
+          PR-13 FAIL:
+          rule '{{ pr13.rule }}' does not exist.
+        success_msg: >-
+          PR-13 PASS:
+          rule '{{ pr13.rule }}' exists.
+
+
+    - name: "PR-13 - Rule enabled"
+      ansible.builtin.assert:
+        that:
+          - pr13_rule_data[0].rule_enabled | bool
+        fail_msg: >-
+          PR-13 FAIL:
+          rule '{{ pr13.rule }}' is disabled.
+        success_msg: >-
+          PR-13 PASS:
+          rule '{{ pr13.rule }}' is enabled.
+
+
+    - name: "PR-13 - Rule is SHOULD RUN"
+      ansible.builtin.assert:
+        that:
+          - not (pr13_rule_data[0].rule_mandatory | bool)
+        fail_msg: >-
+          PR-13 FAIL:
+          rule '{{ pr13.rule }}' is MUST RUN.
+        success_msg: >-
+          PR-13 PASS:
+          rule '{{ pr13.rule }}' is SHOULD RUN.
+
+
+    - name: "PR-13 - Correct VM group"
+      ansible.builtin.assert:
+        that:
+          - pr13_rule_data[0].rule_vm_group_name == pr13.vm_group
+        fail_msg: >-
+          PR-13 FAIL:
+          wrong VM group:
+          {{ pr13_rule_data[0].rule_vm_group_name }}.
+        success_msg: >-
+          PR-13 PASS:
+          correct VM group.
+
+
+    - name: "PR-13 - Correct host group"
+      ansible.builtin.assert:
+        that:
+          - pr13_rule_data[0].rule_affine_host_group_name == pr13.host_group
+        fail_msg: >-
+          PR-13 FAIL:
+          wrong host group:
+          {{ pr13_rule_data[0].rule_affine_host_group_name }}.
+        success_msg: >-
+          PR-13 PASS:
+          correct host group.
+
+
+    # ========================================================
+    # PR-14
+    # ========================================================
+
+    - name: "PR-14 - Locate VM group"
+      ansible.builtin.set_fact:
+        pr14_vm_group_data: >-
+          {{
+            (
+              bcdr_group_info.drs_group_info[pr14.cluster]
+              | default([])
+            )
+            | selectattr('type', 'equalto', 'vm')
+            | selectattr('group_name', 'equalto', pr14.vm_group)
+            | list
+          }}
+
+
+    - name: "PR-14 - VM group exists"
+      ansible.builtin.assert:
+        that:
+          - pr14_vm_group_data | length == 1
+        fail_msg: >-
+          PR-14 FAIL:
+          VM group '{{ pr14.vm_group }}' does not exist.
+        success_msg: >-
+          PR-14 PASS:
+          VM group '{{ pr14.vm_group }}' exists.
+
+
+    - name: "PR-14 - VM group membership"
+      ansible.builtin.assert:
+        that:
+          - pr14.vms | difference(pr14_vm_group_data[0].vms | default([])) | length == 0
+        fail_msg: >-
+          PR-14 FAIL:
+          expected {{ pr14.vms }},
+          actual:
+          {{ pr14_vm_group_data[0].vms | default([]) }}.
+        success_msg: >-
+          PR-14 PASS:
+          fixed VMs are in {{ pr14.vm_group }}.
+
+
+    - name: "PR-14 - Host group exists"
+      ansible.builtin.assert:
+        that:
+          - pr13_host_group_data | length == 1
+        fail_msg: >-
+          PR-14 FAIL:
+          host group '{{ pr14.host_group }}' does not exist.
+        success_msg: >-
+          PR-14 PASS:
+          host group '{{ pr14.host_group }}' exists.
+
+
+    - name: "PR-14 - Locate MUST RUN rule"
+      ansible.builtin.set_fact:
+        pr14_rule_data: >-
+          {{
+            (
+              bcdr_rule_info.drs_rule_info[pr14.cluster]
+              | default([])
+            )
+            | selectattr('rule_name', 'equalto', pr14.rule)
+            | list
+          }}
+
+
+    - name: "PR-14 - Rule exists"
+      ansible.builtin.assert:
+        that:
+          - pr14_rule_data | length == 1
+        fail_msg: >-
+          PR-14 FAIL:
+          MUST RUN rule '{{ pr14.rule }}' does not exist.
+        success_msg: >-
+          PR-14 PASS:
+          MUST RUN rule '{{ pr14.rule }}' exists.
+
+
+    - name: "PR-14 - Rule enabled"
+      ansible.builtin.assert:
+        that:
+          - pr14_rule_data[0].rule_enabled | bool
+        fail_msg: >-
+          PR-14 FAIL:
+          rule '{{ pr14.rule }}' is disabled.
+        success_msg: >-
+          PR-14 PASS:
+          rule '{{ pr14.rule }}' is enabled.
+
+
+    - name: "PR-14 - Rule is MUST RUN"
+      ansible.builtin.assert:
+        that:
+          - pr14_rule_data[0].rule_mandatory | bool
+        fail_msg: >-
+          PR-14 FAIL:
+          rule '{{ pr14.rule }}' is SHOULD RUN.
+        success_msg: >-
+          PR-14 PASS:
+          rule '{{ pr14.rule }}' is MUST RUN.
+
+
+    - name: "PR-14 - Correct VM group"
+      ansible.builtin.assert:
+        that:
+          - pr14_rule_data[0].rule_vm_group_name == pr14.vm_group
+        fail_msg: >-
+          PR-14 FAIL:
+          wrong VM group:
+          {{ pr14_rule_data[0].rule_vm_group_name }}.
+        success_msg: >-
+          PR-14 PASS:
+          correct VM group.
+
+
+    - name: "PR-14 - Correct host group"
+      ansible.builtin.assert:
+        that:
+          - pr14_rule_data[0].rule_affine_host_group_name == pr14.host_group
+        fail_msg: >-
+          PR-14 FAIL:
+          wrong host group:
+          {{ pr14_rule_data[0].rule_affine_host_group_name }}.
+        success_msg: >-
+          PR-14 PASS:
+          correct host group.
+
+
+    # ========================================================
+    # FINAL SUMMARY
+    # ========================================================
+
+    - name: Final SCCM PR summary
+      ansible.builtin.debug:
+        msg:
+          PR-8: "PASS"
+          PR-9: "PASS"
+          PR-10: "PASS"
+          PR-11: "PASS"
+          PR-12: "PASS"
+          PR-13: "PASS"
+          PR-14: "PASS"
