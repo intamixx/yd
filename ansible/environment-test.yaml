@@ -39,7 +39,6 @@
       ansible.builtin.debug:
         msg:
           - "Python executable: {{ python_exe.stdout }}"
-          - "Python version: {{ python_version.stdout | default(python_version.stderr) }}"
+          - "Python version: {{ python_version.stdout }}"
           - "Ansible core: {{ ansible_core.stdout }}"
           - "pyVmomi: {{ pyvmomi_version.stdout }}"
-          - "Ansible version output: {{ ansible_version.stdout | default(ansible_version.stderr) }}"
