@@ -4,24 +4,42 @@
   gather_facts: false
 
   tasks:
+
     - name: Show Python executable
-      command: python3 -c "import sys; print(sys.executable)"
+      ansible.builtin.command:
+        cmd: python3 -c "import sys; print(sys.executable)"
       register: python_exe
       changed_when: false
 
     - name: Show Python version
-      command: python3 --version
+      ansible.builtin.command:
+        cmd: python3 --version
       register: python_version
       changed_when: false
 
     - name: Show Ansible version
-      command: ansible --version
+      ansible.builtin.command:
+        cmd: ansible --version
       register: ansible_version
       changed_when: false
 
+    - name: Show Ansible core version directly
+      ansible.builtin.command:
+        cmd: python3 -c "import ansible; print(ansible.__version__)"
+      register: ansible_core
+      changed_when: false
+
+    - name: Show pyVmomi version
+      ansible.builtin.command:
+        cmd: python3 -c "from importlib.metadata import version; print(version('pyVmomi'))"
+      register: pyvmomi_version
+      changed_when: false
+
     - name: Display environment
-      debug:
+      ansible.builtin.debug:
         msg:
           - "Python executable: {{ python_exe.stdout }}"
-          - "Python version: {{ python_version.stdout }}"
-          - "Ansible: {{ ansible_version.stdout_lines }}"
+          - "Python version: {{ python_version.stdout | default(python_version.stderr) }}"
+          - "Ansible core: {{ ansible_core.stdout }}"
+          - "pyVmomi: {{ pyvmomi_version.stdout }}"
+          - "Ansible version output: {{ ansible_version.stdout | default(ansible_version.stderr) }}"
