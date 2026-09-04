@@ -19,15 +19,9 @@
       register: ansible_version
       changed_when: false
 
-    - name: Show VMware collection
-      command: ansible-galaxy collection list community.vmware
-      register: collection
-      changed_when: false
-
     - name: Display environment
       debug:
         msg:
           - "Python executable: {{ python_exe.stdout }}"
           - "Python version: {{ python_version.stdout }}"
           - "Ansible: {{ ansible_version.stdout_lines }}"
-          - "VMware collection: {{ collection.stdout_lines }}"
