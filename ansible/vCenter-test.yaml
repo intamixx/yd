@@ -7,6 +7,7 @@
     - name: Get VMware VM information
       community.vmware.vmware_vm_info:
         hostname: "192.168.0.195"
+        port: 8989
         username: "user"
         password: "pass"
         validate_certs: false
