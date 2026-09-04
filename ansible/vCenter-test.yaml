@@ -1,18 +1,17 @@
 ---
-- name: Test VMware collection
+- name: Test VMware connection
   hosts: localhost
   gather_facts: false
 
   tasks:
-    - name: Load VMware guest module
-      community.vmware.vmware_guest:
+    - name: Get VMware VM information
+      community.vmware.vmware_vm_info:
         hostname: "192.168.0.195"
         username: "user"
         password: "pass"
         validate_certs: false
       register: vmware_test
-      ignore_errors: true
 
-    - name: Show VMware module result
+    - name: Show VMware result
       ansible.builtin.debug:
         var: vmware_test
