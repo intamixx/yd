@@ -2,6 +2,10 @@
 - name: Test VMware connection
   hosts: localhost
   gather_facts: false
+  
+  vars_files:
+  - group_vars/vars.yaml
+  - group_vars/vault.yaml
 
   tasks:
     - name: Get VMware VM information
