@@ -6,10 +6,10 @@
   tasks:
     - name: Get VMware VM information
       community.vmware.vmware_vm_info:
-        hostname: "192.168.0.195"
-        port: 8989
-        username: "user"
-        password: "pass"
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        port: "{{ vcenter_port }}"
         validate_certs: false
       register: vmware_test
 
@@ -19,10 +19,10 @@
 
     - name: Get vCenter information
       community.vmware.vmware_about_info:
-        hostname: "192.168.0.195"
-        port: 8989
-        username: "user"
-        password: "pass"
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        port: "{{ vcenter_port }}"
         validate_certs: false
       register: vcenter_info
 
