@@ -12,10 +12,10 @@
     # VCENTER
     # ========================================================
 
-    #vcenter_hostname: "{{ vcenter_hostname }}"
-    #vcenter_username: "{{ vcenter_username }}"
-    #vcenter_password: "{{ vcenter_password }}"
-    #vcenter_port: "{{ vcenter_port }}"
+    vcenter_hostname: "{{ vcenter_hostname }}"
+    vcenter_username: "{{ vcenter_username }}"
+    vcenter_password: "{{ vcenter_password }}"
+    vcenter_port: "{{ vcenter_port }}"
 
     datacenter_name: "DC0"
 
