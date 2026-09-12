@@ -40,6 +40,34 @@
         cmd: python3 -m pip show pyVmomi
       register: pyvmomi_info
       changed_when: false
+      
+    - name: Display Python executable
+      ansible.builtin.debug:
+        var: python_exe.stdout
+
+    - name: Display Python version
+      ansible.builtin.debug:
+        var: python_version.stdout
+
+    - name: Display Ansible executable
+      ansible.builtin.debug:
+        var: ansible_cmd_version.stdout_lines
+
+    - name: Display Ansible core version
+      ansible.builtin.debug:
+        var: ansible_core.stdout
+
+    - name: Display pyVmomi location
+      ansible.builtin.debug:
+        var: pyvmomi_import.stdout
+
+    - name: Display pyVmomi package
+      ansible.builtin.debug:
+        var: pyvmomi_info.stdout_lines
+
+    - name: Display built-in Ansible version
+      ansible.builtin.debug:
+        var: ansible_version
 
     - name: Display environment
       ansible.builtin.debug:
