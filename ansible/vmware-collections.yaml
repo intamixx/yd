@@ -1,0 +1,46 @@
+---
+- name: Test VMware collection
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+
+    - name: Show Ansible collection paths
+      ansible.builtin.command: ansible-config dump
+      register: ansible_config
+      changed_when: false
+
+    - name: Display collection paths
+      ansible.builtin.debug:
+        msg: "{{ ansible_config.stdout_lines | select('search', 'COLLECTIONS_PATHS') | list }}"
+
+    - name: Find VMware collection
+      ansible.builtin.shell: |
+        find /tmp -path '*/requirements_collections/ansible_collections/community/vmware' -type d -print 2>/dev/null
+      register: vmware_collection
+      changed_when: false
+
+    - name: Display VMware collection location
+      ansible.builtin.debug:
+        var: vmware_collection.stdout_lines
+
+    - name: Show VMware collection version
+      ansible.builtin.shell: |
+        find /tmp -path '*/requirements_collections/ansible_collections/community/vmware/MANIFEST.json' \
+          -exec grep '"version"' {} \; 2>/dev/null
+      register: vmware_version
+      changed_when: false
+
+    - name: Display VMware collection version
+      ansible.builtin.debug:
+        var: vmware_version.stdout_lines
+
+    - name: Check VMware module
+      ansible.builtin.command:
+        cmd: ansible-doc community.vmware.vmware_guest
+      register: vmware_doc
+      changed_when: false
+
+    - name: Display module result
+      ansible.builtin.debug:
+        msg: "{{ vmware_doc.stdout_lines[:10] }}"
