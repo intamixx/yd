@@ -1,4 +1,4 @@
 ---
 collections:
   - name: community.vmware
-    version: "3.7.0"
+    version: "1.18.0"
