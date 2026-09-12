@@ -1,0 +1,52 @@
+---
+- name: Test custom Ansible virtualenv
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+
+    - name: Show Python executable
+      ansible.builtin.command:
+        cmd: python3 -c "import sys; print(sys.executable)"
+      register: python_exe
+      changed_when: false
+
+    - name: Show Python version
+      ansible.builtin.command:
+        cmd: python3 --version
+      register: python_version
+      changed_when: false
+
+    - name: Show Ansible version
+      ansible.builtin.command:
+        cmd: ansible --version
+      register: ansible_version
+      changed_when: false
+
+    - name: Show Ansible core version directly
+      ansible.builtin.command:
+        cmd: python3 -c "import ansible; print(ansible.__version__)"
+      register: ansible_core
+      changed_when: false
+
+    - name: Test pyVmomi import
+      ansible.builtin.command:
+        cmd: python3 -c "import pyVmomi; print(pyVmomi.__file__)"
+      register: pyvmomi_import
+      changed_when: false
+
+    - name: Show pyVmomi package information
+      ansible.builtin.command:
+        cmd: python3 -m pip show pyVmomi
+      register: pyvmomi_info
+      changed_when: false
+
+    - name: Display environment
+      ansible.builtin.debug:
+        msg:
+          - "Python executable: {{ python_exe.stdout }}"
+          - "Python version: {{ python_version.stdout }}"
+          - "Ansible executable: {{ ansible_version.stdout_lines[0] }}"
+          - "Ansible core: {{ ansible_core.stdout }}"
+          - "pyVmomi location: {{ pyvmomi_import.stdout }}"
+          - "pyVmomi package: {{ pyvmomi_info.stdout_lines }}"
