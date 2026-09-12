@@ -1,0 +1,16 @@
+---
+- name: Test pyVmomi
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+
+    - name: Check pyVmomi
+      ansible.builtin.command:
+        cmd: python -c "import pyVmomi; print(pyVmomi.__version__)"
+      register: pyvmomi
+      changed_when: false
+
+    - name: Display pyVmomi version
+      ansible.builtin.debug:
+        var: pyvmomi.stdout
