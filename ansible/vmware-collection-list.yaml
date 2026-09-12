@@ -1,0 +1,26 @@
+---
+- name: Test VMware collection
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+
+    - name: Show VMware collection version
+      ansible.builtin.shell: |
+        cat /tmp/bwrap_*/awx_*/requirements_collections/ansible_collections/community/vmware/MANIFEST.json 2>/dev/null
+      register: manifest
+      changed_when: false
+
+    - name: Display manifest
+      ansible.builtin.debug:
+        var: manifest.stdout
+
+    - name: Check VMware module
+      ansible.builtin.command:
+        cmd: ansible-doc community.vmware.vmware_guest
+      register: vmware_doc
+      changed_when: false
+
+    - name: Display module result
+      ansible.builtin.debug:
+        msg: "{{ vmware_doc.stdout_lines[:20] }}"
