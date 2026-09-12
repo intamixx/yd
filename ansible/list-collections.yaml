@@ -2,21 +2,23 @@
 - name: Test VMware connection
   hosts: localhost
   gather_facts: false
-  
+
   tasks:
 
     - name: Show Ansible collection paths
-      command: ansible-config dump
+      ansible.builtin.command: ansible-config dump
       register: ansible_config
       changed_when: false
 
-    - debug:
-      msg: "{{ ansible_config.stdout_lines | select('search', 'COLLECTIONS_PATHS') | list }}"
+    - name: Display collection paths
+      ansible.builtin.debug:
+        msg: "{{ ansible_config.stdout_lines | select('search', 'COLLECTIONS_PATHS') | list }}"
 
-    - name: Show collection
-      command: ansible-galaxy collection list
+    - name: Show installed collections
+      ansible.builtin.command: ansible-galaxy collection list
       register: collections
       changed_when: false
 
-    - debug:
-      var: collections.stdout_lines
+    - name: Display installed collections
+      ansible.builtin.debug:
+        var: collections.stdout_lines
