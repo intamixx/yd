@@ -1,3 +1,4 @@
+---
 - name: Show Ansible version
   ansible.builtin.command: ansible --version
   register: ansible_ver
