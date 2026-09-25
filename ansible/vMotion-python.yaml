@@ -1,0 +1,149 @@
+---
+- name: vMotion VM from CAA1 to CAA2 using VM MoID
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - group_vars/vars.yaml
+    - group_vars/vault.yaml
+
+  vars:
+    vm_name: "TEMPLATE"
+
+    source_cluster: "Test - CAA1 - IaaS"
+
+    destination_host: "ngbw1vhesx6236.iaas.bbc.co.uk"
+    destination_resource_pool: "CAA2 - Test"
+    destination_datastore: "NIMB201-APVC6001-DS1"
+    destination_network: "General_VM_CAA2-949"
+
+  collections:
+    - community.vmware
+
+  tasks:
+
+    - name: Find VM by name
+      community.vmware.vmware_vm_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        vm_name: "{{ vm_name }}"
+      delegate_to: localhost
+      register: vm_lookup
+
+    - name: Verify exactly one VM was found
+      ansible.builtin.assert:
+        that:
+          - vm_lookup.virtual_machines | length == 1
+        fail_msg: >-
+          Expected exactly one VM named '{{ vm_name }}',
+          but found {{ vm_lookup.virtual_machines | length }}.
+
+    - name: Set VM information
+      ansible.builtin.set_fact:
+        vm_before: "{{ vm_lookup.virtual_machines[0] }}"
+        vm_moid: "{{ vm_lookup.virtual_machines[0].moid }}"
+
+    - name: Display VM
+      ansible.builtin.debug:
+        msg:
+          - "VM: {{ vm_name }}"
+          - "MoID: {{ vm_moid }}"
+          - "Source cluster: {{ vm_before.cluster }}"
+          - "Source host: {{ vm_before.esxi_hostname }}"
+          - "Power state: {{ vm_before.power_state }}"
+
+    - name: Verify source cluster
+      ansible.builtin.assert:
+        that:
+          - vm_before.cluster == source_cluster
+        fail_msg: >-
+          VM is not in CAA1.
+          Expected: {{ source_cluster }}
+          Actual: {{ vm_before.cluster }}
+
+    - name: Verify VM is powered off
+      ansible.builtin.assert:
+        that:
+          - vm_before.power_state == "poweredOff"
+        fail_msg: >-
+          VM must be powered off before cold migration.
+          Current state: {{ vm_before.power_state }}
+
+    - name: Relocate VM using MoID
+      ansible.builtin.command:
+        argv:
+          - python3
+          - "{{ playbook_dir }}/vmware_relocate.py"
+          - --host
+          - "{{ vcenter_hostname }}"
+          - --username
+          - "{{ vcenter_username }}"
+          - --password
+          - "{{ vcenter_password }}"
+          - --moid
+          - "{{ vm_moid }}"
+          - --destination-host
+          - "{{ destination_host }}"
+          - --destination-pool
+          - "{{ destination_resource_pool }}"
+          - --destination-datastore
+          - "{{ destination_datastore }}"
+          - --destination-network
+          - "{{ destination_network }}"
+      delegate_to: localhost
+      no_log: true
+      register: relocation_result
+
+    - name: Display relocation result
+      ansible.builtin.debug:
+        msg: "{{ relocation_result.stdout_lines }}"
+
+    - name: Refresh VM information
+      community.vmware.vmware_vm_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        vm_name: "{{ vm_name }}"
+      delegate_to: localhost
+      register: vm_after_lookup
+
+    - name: Set post-migration information
+      ansible.builtin.set_fact:
+        vm_after: "{{ vm_after_lookup.virtual_machines[0] }}"
+
+    - name: Verify VM identity
+      ansible.builtin.assert:
+        that:
+          - vm_after.moid == vm_moid
+          - vm_after.uuid == vm_before.uuid
+          - vm_after.instance_uuid == vm_before.instance_uuid
+
+    - name: Verify destination host
+      ansible.builtin.assert:
+        that:
+          - vm_after.esxi_hostname == destination_host
+
+    - name: Verify destination cluster
+      ansible.builtin.assert:
+        that:
+          - vm_after.cluster == "Test - CAA2 - IaaS"
+
+    - name: Verify VM remains powered off
+      ansible.builtin.assert:
+        that:
+          - vm_after.power_state == "poweredOff"
+
+    - name: Display PASS
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "CAA1 -> CAA2 MIGRATION PASS"
+          - "VM: {{ vm_name }}"
+          - "MoID: {{ vm_after.moid }}"
+          - "Host: {{ vm_after.esxi_hostname }}"
+          - "Cluster: {{ vm_after.cluster }}"
+          - "Power state: {{ vm_after.power_state }}"
+          - "=========================================="
