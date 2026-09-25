@@ -1,0 +1,103 @@
+---
+- name: Power down VM before vMotion
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - group_vars/vars.yaml
+    - group_vars/vault.yaml
+
+  vars:
+    vm_name: "TEMPLATE"
+
+  collections:
+    - community.vmware
+
+  tasks:
+
+    - name: Find VM by name
+      community.vmware.vmware_vm_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        vm_name: "{{ vm_name }}"
+      delegate_to: localhost
+      register: vm_lookup
+
+    - name: Verify exactly one VM was found
+      ansible.builtin.assert:
+        that:
+          - vm_lookup.virtual_machines | length == 1
+        fail_msg: >-
+          Expected exactly one VM named '{{ vm_name }}',
+          but found {{ vm_lookup.virtual_machines | length }}.
+
+    - name: Set VM information
+      ansible.builtin.set_fact:
+        vm_before: "{{ vm_lookup.virtual_machines[0] }}"
+        vm_moid: "{{ vm_lookup.virtual_machines[0].moid }}"
+
+    - name: Display VM before power down
+      ansible.builtin.debug:
+        msg:
+          - "VM: {{ vm_name }}"
+          - "MoID: {{ vm_moid }}"
+          - "Cluster: {{ vm_before.cluster }}"
+          - "Host: {{ vm_before.esxi_hostname }}"
+          - "Power state: {{ vm_before.power_state }}"
+
+    - name: Verify VM is currently powered on
+      ansible.builtin.assert:
+        that:
+          - vm_before.power_state == "poweredOn"
+        fail_msg: >-
+          VM '{{ vm_name }}' is not powered on.
+          Current state: {{ vm_before.power_state }}
+
+    - name: Power down VM
+      community.vmware.vmware_guest_powerstate:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        moid: "{{ vm_moid }}"
+        state: powered-off
+        state_change_timeout: 300
+      delegate_to: localhost
+
+    - name: Refresh VM information
+      community.vmware.vmware_vm_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        vm_name: "{{ vm_name }}"
+      delegate_to: localhost
+      register: vm_after_lookup
+
+    - name: Set post-powerdown information
+      ansible.builtin.set_fact:
+        vm_after: "{{ vm_after_lookup.virtual_machines[0] }}"
+
+    - name: Verify VM is powered off
+      ansible.builtin.assert:
+        that:
+          - vm_after.moid == vm_moid
+          - vm_after.power_state == "poweredOff"
+        fail_msg: >-
+          VM '{{ vm_name }}' did not power off successfully.
+          Current state: {{ vm_after.power_state }}
+
+    - name: Display powerdown PASS
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "POWERDOWN PASS"
+          - "VM: {{ vm_name }}"
+          - "MoID: {{ vm_after.moid }}"
+          - "Cluster: {{ vm_after.cluster }}"
+          - "Host: {{ vm_after.esxi_hostname }}"
+          - "Power state: {{ vm_after.power_state }}"
+          - "Ready for cold migration"
+          - "=========================================="
