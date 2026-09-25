@@ -1,5 +1,5 @@
 ---
-- name: Diagnose AWX VMware Ansible environment
+- name: Diagnose AWX VMware environment
   hosts: localhost
   connection: local
   gather_facts: false
@@ -7,7 +7,7 @@
   tasks:
 
     # ============================================================
-    # Ansible
+    # 1. Ansible version
     # ============================================================
 
     - name: Get Ansible version
@@ -15,14 +15,15 @@
         cmd: ansible --version
       register: cmd_ansible_version
       changed_when: false
+      failed_when: false
 
     - name: Display Ansible version
       ansible.builtin.debug:
-        var: cmd_ansible_version.stdout_lines
+        msg: "{{ cmd_ansible_version.stdout_lines }}"
 
 
     # ============================================================
-    # Python
+    # 2. Python version
     # ============================================================
 
     - name: Get Python version
@@ -30,12 +31,14 @@
         cmd: python3 --version
       register: cmd_python_version
       changed_when: false
+      failed_when: false
 
     - name: Get Python executable
       ansible.builtin.command:
         cmd: which python3
       register: cmd_python_path
       changed_when: false
+      failed_when: false
 
     - name: Display Python information
       ansible.builtin.debug:
@@ -45,10 +48,10 @@
 
 
     # ============================================================
-    # Ansible collection paths
+    # 3. Collection paths
     # ============================================================
 
-    - name: Display collection paths
+    - name: Display Ansible collection paths
       ansible.builtin.debug:
         msg:
           - "ANSIBLE_COLLECTIONS_PATHS={{ lookup('env', 'ANSIBLE_COLLECTIONS_PATHS') }}"
@@ -56,63 +59,119 @@
 
 
     # ============================================================
-    # Locate community.vmware
+    # 4. Determine first collection path
     # ============================================================
 
-    - name: Find community.vmware collection
+    - name: Determine primary collection path
       ansible.builtin.shell: |
-        find /tmp /var/lib/awx/.ansible/collections /usr/share/ansible/collections \
-          -type d \
-          -path '*/ansible_collections/community/vmware' \
-          2>/dev/null
-      register: cmd_vmware_dirs
+        echo "${ANSIBLE_COLLECTIONS_PATHS%%:*}"
+      register: cmd_primary_collection_path
       changed_when: false
+      failed_when: false
 
-    - name: Display community.vmware locations
+    - name: Display primary collection path
       ansible.builtin.debug:
-        var: cmd_vmware_dirs.stdout_lines
+        msg: "{{ cmd_primary_collection_path.stdout }}"
 
 
     # ============================================================
-    # Collection version
+    # 5. Locate community.vmware
     # ============================================================
 
-    - name: Find VMware collection metadata
+    - name: Locate community.vmware collection
       ansible.builtin.shell: |
-        find /tmp /var/lib/awx/.ansible/collections /usr/share/ansible/collections \
-          -type f \
-          \( \
-            -path '*/ansible_collections/community/vmware/galaxy.yml' \
-            -o \
-            -path '*/ansible_collections/community/vmware/MANIFEST.json' \
-          \) \
-          2>/dev/null
+        COLLECTION_ROOT="${ANSIBLE_COLLECTIONS_PATHS%%:*}"
+
+        if [ -d "$COLLECTION_ROOT/ansible_collections/community/vmware" ]; then
+          echo "$COLLECTION_ROOT/ansible_collections/community/vmware"
+          exit 0
+        fi
+
+        for ROOT in \
+          /var/lib/awx/.ansible/collections \
+          /usr/share/ansible/collections
+        do
+          if [ -d "$ROOT/ansible_collections/community/vmware" ]; then
+            echo "$ROOT/ansible_collections/community/vmware"
+          fi
+        done
+
+        exit 0
+      register: cmd_vmware_collection
+      changed_when: false
+      failed_when: false
+
+    - name: Display community.vmware location
+      ansible.builtin.debug:
+        msg: "{{ cmd_vmware_collection.stdout_lines }}"
+
+
+    # ============================================================
+    # 6. Locate MANIFEST.json / galaxy.yml
+    # ============================================================
+
+    - name: Locate VMware collection metadata
+      ansible.builtin.shell: |
+        COLLECTION_ROOT="${ANSIBLE_COLLECTIONS_PATHS%%:*}"
+        COLLECTION="$COLLECTION_ROOT/ansible_collections/community/vmware"
+
+        echo "Collection directory:"
+        echo "$COLLECTION"
+        echo ""
+
+        if [ -f "$COLLECTION/MANIFEST.json" ]; then
+          echo "MANIFEST.json:"
+          echo "$COLLECTION/MANIFEST.json"
+        fi
+
+        if [ -f "$COLLECTION/galaxy.yml" ]; then
+          echo "galaxy.yml:"
+          echo "$COLLECTION/galaxy.yml"
+        fi
+
+        echo ""
+        echo "Metadata files found:"
+        find "$COLLECTION" -maxdepth 2 -type f \
+          \( -name MANIFEST.json -o -name galaxy.yml \) \
+          -print 2>/dev/null || true
+
+        exit 0
       register: cmd_vmware_metadata
       changed_when: false
+      failed_when: false
 
     - name: Display VMware metadata
       ansible.builtin.debug:
         var: cmd_vmware_metadata.stdout_lines
 
 
-    - name: Read VMware collection version
+    # ============================================================
+    # 7. Extract VMware collection version
+    # ============================================================
+
+    - name: Extract VMware collection version
       ansible.builtin.shell: |
-        for f in $(find /tmp /var/lib/awx/.ansible/collections /usr/share/ansible/collections \
-          -type f \
-          \( \
-            -path '*/ansible_collections/community/vmware/galaxy.yml' \
-            -o \
-            -path '*/ansible_collections/community/vmware/MANIFEST.json' \
-          \) \
-          2>/dev/null); do
+        COLLECTION_ROOT="${ANSIBLE_COLLECTIONS_PATHS%%:*}"
+        COLLECTION="$COLLECTION_ROOT/ansible_collections/community/vmware"
 
-          echo "===== $f ====="
+        echo "Looking in:"
+        echo "$COLLECTION"
+        echo ""
 
-          grep -E '"version"|^version:' "$f" 2>/dev/null || true
+        if [ -f "$COLLECTION/MANIFEST.json" ]; then
+          echo "MANIFEST.json version:"
+          grep -i '"version"' "$COLLECTION/MANIFEST.json" | head -5 || true
+        fi
 
-        done
+        if [ -f "$COLLECTION/galaxy.yml" ]; then
+          echo "galaxy.yml version:"
+          grep -E '^version:' "$COLLECTION/galaxy.yml" || true
+        fi
+
+        exit 0
       register: cmd_vmware_version
       changed_when: false
+      failed_when: false
 
     - name: Display VMware collection version
       ansible.builtin.debug:
@@ -120,44 +179,52 @@
 
 
     # ============================================================
-    # Test module discovery
+    # 8. Verify vmware_guest module
     # ============================================================
 
-    - name: Inspect vmware_guest
+    - name: Check vmware_guest module
       ansible.builtin.command:
         cmd: ansible-doc community.vmware.vmware_guest
       register: cmd_vmware_guest_doc
       changed_when: false
       failed_when: false
 
-    - name: Display vmware_guest result
+    - name: Display vmware_guest module result
       ansible.builtin.debug:
         msg:
           - "Return code: {{ cmd_vmware_guest_doc.rc }}"
-          - "{{ cmd_vmware_guest_doc.stdout_lines[:25] }}"
-          - "{{ cmd_vmware_guest_doc.stderr_lines[:25] }}"
+          - "First lines:"
+          - "{{ cmd_vmware_guest_doc.stdout_lines[:30] }}"
+          - "Errors:"
+          - "{{ cmd_vmware_guest_doc.stderr_lines[:30] }}"
 
 
-    - name: Inspect vmware_vm_info
+    # ============================================================
+    # 9. Verify vmware_vm_info module
+    # ============================================================
+
+    - name: Check vmware_vm_info module
       ansible.builtin.command:
         cmd: ansible-doc community.vmware.vmware_vm_info
       register: cmd_vmware_vm_info_doc
       changed_when: false
       failed_when: false
 
-    - name: Display vmware_vm_info result
+    - name: Display vmware_vm_info module result
       ansible.builtin.debug:
         msg:
           - "Return code: {{ cmd_vmware_vm_info_doc.rc }}"
-          - "{{ cmd_vmware_vm_info_doc.stdout_lines[:25] }}"
-          - "{{ cmd_vmware_vm_info_doc.stderr_lines[:25] }}"
+          - "First lines:"
+          - "{{ cmd_vmware_vm_info_doc.stdout_lines[:30] }}"
+          - "Errors:"
+          - "{{ cmd_vmware_vm_info_doc.stderr_lines[:30] }}"
 
 
     # ============================================================
-    # Python LooseVersion
+    # 10. Test LooseVersion
     # ============================================================
 
-    - name: Test LooseVersion
+    - name: Test Python LooseVersion
       ansible.builtin.command:
         cmd: >
           python3 -c
@@ -176,10 +243,10 @@
 
 
     # ============================================================
-    # Python packaging
+    # 11. Test packaging
     # ============================================================
 
-    - name: Test packaging
+    - name: Test Python packaging
       ansible.builtin.command:
         cmd: >
           python3 -c
@@ -198,7 +265,7 @@
 
 
     # ============================================================
-    # pyVmomi
+    # 12. Test pyVmomi
     # ============================================================
 
     - name: Test pyVmomi
@@ -220,94 +287,170 @@
 
 
     # ============================================================
-    # Python package versions
+    # 13. Show Python VMware packages
     # ============================================================
 
-    - name: Show relevant Python packages
+    - name: Show installed VMware Python packages
       ansible.builtin.shell: |
         python3 -m pip list 2>/dev/null |
         grep -Ei \
-          'ansible|vmware|pyvmomi|vsphere|packaging|setuptools|distlib' ||
-        true
+          'ansible|vmware|pyvmomi|vsphere|packaging|setuptools|distlib' \
+          || true
+
+        exit 0
       register: cmd_python_packages
       changed_when: false
+      failed_when: false
 
-    - name: Display Python packages
+    - name: Display VMware Python packages
       ansible.builtin.debug:
         var: cmd_python_packages.stdout_lines
 
 
     # ============================================================
-    # Locate support files
+    # 14. Test imports commonly used by VMware modules
     # ============================================================
 
-    - name: Find VMware support files
+    - name: Test VMware-related Python imports
       ansible.builtin.shell: |
-        find /tmp /var/lib/awx/.ansible/collections /usr/share/ansible/collections \
-          -type f \
-          \( \
-            -name 'LooseVersion.py' \
-            -o -name 'version.py' \
-            -o -name 'vmware*.py' \
-          \) \
-          2>/dev/null |
-          head -300
-      register: cmd_support_files
+        python3 - <<'PY'
+        import sys
+
+        print("Python:", sys.version)
+        print("")
+
+        modules = [
+            "pyVmomi",
+            "pyVim",
+            "packaging",
+            "setuptools",
+            "distutils",
+        ]
+
+        for module in modules:
+            try:
+                imported = __import__(module)
+                print("OK     :", module)
+                print("PATH   :", getattr(imported, "__file__", "built-in"))
+            except Exception as e:
+                print("FAILED :", module)
+                print("ERROR  :", repr(e))
+
+            print("")
+        PY
+      register: cmd_python_imports
       changed_when: false
+      failed_when: false
 
-    - name: Display support files
+    - name: Display Python import results
       ansible.builtin.debug:
-        var: cmd_support_files.stdout_lines
+        var: cmd_python_imports.stdout_lines
 
 
     # ============================================================
-    # Exact module location
+    # 15. Find VMware module
     # ============================================================
 
-    - name: Find vmware_guest.py
+    - name: Locate vmware_guest.py
       ansible.builtin.shell: |
-        find /tmp /var/lib/awx/.ansible/collections /usr/share/ansible/collections \
+        COLLECTION_ROOT="${ANSIBLE_COLLECTIONS_PATHS%%:*}"
+
+        find "$COLLECTION_ROOT/ansible_collections/community/vmware" \
           -type f \
-          -path '*/community/vmware/plugins/modules/vmware_guest.py' \
-          2>/dev/null
+          -name 'vmware_guest.py' \
+          -print 2>/dev/null || true
+
+        exit 0
       register: cmd_vmware_guest_path
       changed_when: false
+      failed_when: false
 
-    - name: Display vmware_guest.py location
+    - name: Display vmware_guest.py path
       ansible.builtin.debug:
         var: cmd_vmware_guest_path.stdout_lines
 
 
     # ============================================================
-    # Final summary
+    # 16. Find the module-support directory
     # ============================================================
 
-    - name: Display diagnostic summary
+    - name: Inspect VMware module support directories
+      ansible.builtin.shell: |
+        COLLECTION_ROOT="${ANSIBLE_COLLECTIONS_PATHS%%:*}"
+        COLLECTION="$COLLECTION_ROOT/ansible_collections/community/vmware"
+
+        echo "Potential support files:"
+        find "$COLLECTION" \
+          -type f \
+          \( \
+            -name 'version.py' \
+            -o -name 'LooseVersion.py' \
+            -o -name 'module_utils.py' \
+          \) \
+          -print 2>/dev/null || true
+
+        echo ""
+        echo "Module utils:"
+        find "$COLLECTION/plugins/module_utils" \
+          -maxdepth 3 \
+          -type f \
+          -print 2>/dev/null || true
+
+        exit 0
+      register: cmd_vmware_support
+      changed_when: false
+      failed_when: false
+
+    - name: Display VMware support information
+      ansible.builtin.debug:
+        var: cmd_vmware_support.stdout_lines
+
+
+    # ============================================================
+    # 17. Final summary
+    # ============================================================
+
+    - name: Display final diagnostic summary
       ansible.builtin.debug:
         msg:
-          - "=============================================="
-          - "AWX VMware diagnostic complete"
-          - "=============================================="
-          - "Ansible:"
+          - "============================================================"
+          - "AWX VMWARE DIAGNOSTIC SUMMARY"
+          - "============================================================"
+          - ""
+          - "ANSIBLE:"
           - "{{ cmd_ansible_version.stdout_lines }}"
-          - "Python:"
+          - ""
+          - "PYTHON:"
           - "{{ cmd_python_version.stdout }}"
-          - "Python executable:"
+          - ""
+          - "PYTHON EXECUTABLE:"
           - "{{ cmd_python_path.stdout }}"
-          - "VMware collection:"
-          - "{{ cmd_vmware_dirs.stdout_lines }}"
-          - "VMware version:"
+          - ""
+          - "COLLECTION PATHS:"
+          - "{{ lookup('env', 'ANSIBLE_COLLECTIONS_PATHS') }}"
+          - ""
+          - "VMWARE COLLECTION:"
+          - "{{ cmd_vmware_collection.stdout_lines }}"
+          - ""
+          - "VMWARE VERSION:"
           - "{{ cmd_vmware_version.stdout_lines }}"
-          - "LooseVersion:"
+          - ""
+          - "LOOSEVERSION:"
           - "rc={{ cmd_looseversion.rc }}"
           - "stdout={{ cmd_looseversion.stdout }}"
           - "stderr={{ cmd_looseversion.stderr }}"
-          - "Packaging:"
+          - ""
+          - "PACKAGING:"
           - "rc={{ cmd_packaging.rc }}"
           - "stdout={{ cmd_packaging.stdout }}"
           - "stderr={{ cmd_packaging.stderr }}"
-          - "pyVmomi:"
+          - ""
+          - "PYVMOMI:"
           - "rc={{ cmd_pyvmomi.rc }}"
           - "stdout={{ cmd_pyvmomi.stdout }}"
           - "stderr={{ cmd_pyvmomi.stderr }}"
-          - "=============================================="
+          - ""
+          - "PYTHON PACKAGES:"
+          - "{{ cmd_python_packages.stdout_lines }}"
+          - ""
+          - "============================================================"
