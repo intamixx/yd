@@ -123,6 +123,3 @@
           - "Power state: {{ vm_after.power_state }}"
           - "Ready for cold migration"
           - "=========================================="
-
-
-This keeps your existing vars.yaml/vault.yaml structure and uses the same vmware_vm_info → MoID → vmware_guest_powerstate workflow.
