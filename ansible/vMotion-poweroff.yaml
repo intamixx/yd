@@ -1,6 +1,7 @@
 ---
 - name: Power down VM before vMotion
   hosts: localhost
+  connection: local
   gather_facts: false
 
   vars_files:
@@ -22,16 +23,18 @@
         password: "{{ vcenter_password }}"
         validate_certs: false
         vm_name: "{{ vm_name }}"
-      delegate_to: localhost
       register: vm_lookup
 
     - name: Verify exactly one VM was found
       ansible.builtin.assert:
         that:
+          - vm_lookup.virtual_machines is defined
           - vm_lookup.virtual_machines | length == 1
         fail_msg: >-
           Expected exactly one VM named '{{ vm_name }}',
-          but found {{ vm_lookup.virtual_machines | length }}.
+          but found {{
+            vm_lookup.virtual_machines | default([]) | length
+          }}.
 
     - name: Set VM information
       ansible.builtin.set_fact:
@@ -41,11 +44,14 @@
     - name: Display VM before power down
       ansible.builtin.debug:
         msg:
+          - "=========================================="
+          - "VM FOUND"
           - "VM: {{ vm_name }}"
           - "MoID: {{ vm_moid }}"
-          - "Cluster: {{ vm_before.cluster }}"
-          - "Host: {{ vm_before.esxi_hostname }}"
+          - "Cluster: {{ vm_before.cluster | default('N/A') }}"
+          - "Host: {{ vm_before.esxi_hostname | default('N/A') }}"
           - "Power state: {{ vm_before.power_state }}"
+          - "=========================================="
 
     - name: Verify VM is currently powered on
       ansible.builtin.assert:
@@ -64,7 +70,10 @@
         moid: "{{ vm_moid }}"
         state: powered-off
         state_change_timeout: 300
-      delegate_to: localhost
+
+    - name: Wait for VM power state to settle
+      ansible.builtin.pause:
+        seconds: 5
 
     - name: Refresh VM information
       community.vmware.vmware_vm_info:
@@ -73,8 +82,15 @@
         password: "{{ vcenter_password }}"
         validate_certs: false
         vm_name: "{{ vm_name }}"
-      delegate_to: localhost
       register: vm_after_lookup
+
+    - name: Verify VM still exists
+      ansible.builtin.assert:
+        that:
+          - vm_after_lookup.virtual_machines is defined
+          - vm_after_lookup.virtual_machines | length == 1
+        fail_msg: >-
+          VM '{{ vm_name }}' could not be found after the power-down operation.
 
     - name: Set post-powerdown information
       ansible.builtin.set_fact:
@@ -89,15 +105,24 @@
           VM '{{ vm_name }}' did not power off successfully.
           Current state: {{ vm_after.power_state }}
 
+          MoID before: {{ vm_moid }}
+          MoID after: {{ vm_after.moid | default('N/A') }}
+
+          Power state after: {{ vm_after.power_state | default('N/A') }}
+
     - name: Display powerdown PASS
       ansible.builtin.debug:
         msg:
           - "=========================================="
           - "POWERDOWN PASS"
+          - "=========================================="
           - "VM: {{ vm_name }}"
           - "MoID: {{ vm_after.moid }}"
-          - "Cluster: {{ vm_after.cluster }}"
-          - "Host: {{ vm_after.esxi_hostname }}"
+          - "Cluster: {{ vm_after.cluster | default('N/A') }}"
+          - "Host: {{ vm_after.esxi_hostname | default('N/A') }}"
           - "Power state: {{ vm_after.power_state }}"
           - "Ready for cold migration"
           - "=========================================="
+
+
+This keeps your existing vars.yaml/vault.yaml structure and uses the same vmware_vm_info → MoID → vmware_guest_powerstate workflow.
