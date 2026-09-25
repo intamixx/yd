@@ -1,0 +1,268 @@
+---
+- name: Test vCenter connectivity
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - group_vars/vault.yaml
+    - group_vars/vars.yaml
+
+  vars:
+    # ========================================================
+    # PR-8
+    #
+    # Production Cluster 1
+    #
+    # hrp-wld2-cluster1
+    #   SCCOPS001-AP1
+    #     BGB01AP1519
+    # ========================================================
+
+    pr8:
+      cluster: "Test - CAA1 - IaaS"
+      resource_pool: "SCCOPS001-AP1"
+      vms:
+        - "BGB01AP1519"
+
+    # ========================================================
+    # PR-9
+    #
+    # Production Cluster 1
+    #
+    # VM Group:
+    #   SCCOPS001-GP1
+    #
+    # Host Group:
+    #   Cluster1-AZ1-Host
+    #
+    # Rule:
+    #   SCCOPS001-HA1
+    #   SHOULD RUN
+    # ========================================================
+
+    pr9:
+      cluster: "Test - CAA2 - IaaS"
+
+      vm_group: "SCCOPS001-GP1"
+
+      vm:
+        - "BGB01AP1519"
+
+      host_group: "Cluster1-AZ1-Host"
+
+      hosts:
+        - "DC0_C1_H0"
+        - "DC0_C1_H1"
+
+      rule: "SCCOPS001-HA1"
+
+  tasks:
+    - name: Get vCenter information
+      community.vmware.vmware_about_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        port: "{{ vcenter_port }}"
+        validate_certs: false
+      register: vcenter_info
+
+    - name: Display vCenter information
+      ansible.builtin.debug:
+        var: vcenter_info
+
+    - name: Gather VMware VM inventory
+      community.vmware.vmware_vm_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        port: "{{ vcenter_port }}"
+        validate_certs: false
+      register: vm_info
+      delegate_to: localhost
+
+    - name: "PR-8 - Dump all VM objects"
+      ansible.builtin.debug:
+        var: item
+      loop: "{{ vm_info.virtual_machines }}"
+      loop_control:
+        label: "{{ item.guest_name | default('unknown') }}"
+
+    # ========================================================
+    # RESOURCE POOL INFORMATION
+    # ========================================================
+
+    - name: Gather VMware resource pool information
+      community.vmware.vmware_resource_pool_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        port: "{{ vcenter_port }}"
+        validate_certs: false
+      register: resource_pool_info
+      delegate_to: localhost
+
+    # ========================================================
+    # DRS GROUPS
+    # ========================================================
+
+    - name: Gather DRS groups - test CAA1 cluster
+      community.vmware.vmware_drs_group_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        port: "{{ vcenter_port }}"
+        cluster_name: "{{ pr8.cluster }}"
+        validate_certs: false
+      register: pr8_group_info
+      delegate_to: localhost
+
+    # ========================================================
+    # DRS RULES
+    # ========================================================
+
+    - name: Gather DRS rules - test CAA1 cluster
+      community.vmware.vmware_drs_rule_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        port: "{{ vcenter_port }}"
+        cluster_name: "{{ pr8.cluster }}"
+        validate_certs: false
+      register: pr8_rule_info
+      delegate_to: localhost
+
+
+    # ========================================================
+    # DEBUG - SHOW ACTUAL MODULE RESULTS
+    #
+    # Keep these for the first run. They let us verify exactly
+    # what your installed collection returns.
+    # ========================================================
+
+    - name: Show production DRS groups - test
+      ansible.builtin.debug:
+        var: pr8_group_info.drs_group_info
+
+    - name: Show production DRS rules - test
+      ansible.builtin.debug:
+        var: pr8_rule_info.drs_rule_info
+
+    - name: Show BCDR DRS groups
+      ansible.builtin.debug:
+        var: bcdr_group_info.drs_group_info
+
+    - name: Show BCDR DRS rules
+      ansible.builtin.debug:
+        var: bcdr_rule_info.drs_rule_info
+
+    - name: Display resource pools
+      ansible.builtin.debug:
+        var: resource_pool_info.resource_pool_info
+
+    - name: Display each resource pool
+      ansible.builtin.debug:
+        msg:
+          - "Name: {{ item.name }}"
+          - "MOID: {{ item.moid | default('N/A') }}"
+          - "Parent: {{ item.parent | default('N/A') }}"
+        loop: "{{ resource_pool_info.resource_pool_info }}"
+# Correct
+    - name: Display each resource pool
+      ansible.builtin.debug:
+        msg:
+          - "Name: {{ item.name }}"
+      loop: "{{ resource_pool_info.resource_pool_info }}"
+
+    - name: Display each resource pool
+      ansible.builtin.debug:
+        msg:
+          - "Name: {{ item.name }}"
+          - "Owner: {{ item.owner }}"
+          - "CPU reservation: {{ item.cpu_allocation_reservation }}"
+          - "Memory reservation: {{ item.mem_allocation_reservation }}"
+      loop: "{{ resource_pool_info.resource_pool_info }}"
+
+    - name: Display CAA1 resource pools
+      ansible.builtin.debug:
+        msg:
+          - "Name: {{ item.name }}"
+          - "Owner: {{ item.owner }}"
+          - "CPU reservation: {{ item.cpu_allocation_reservation }}"
+          - "Memory reservation: {{ item.mem_allocation_reservation }}"
+      loop: >-
+       {{
+         resource_pool_info.resource_pool_info
+         | selectattr('owner', 'equalto', 'Test - CAA1 - IaaS')
+         | list
+       }}
+
+    - name: Gather DRS groups - test CAA1 cluster
+      community.vmware.vmware_drs_group_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        port: "{{ vcenter_port }}"
+        cluster_name: "Test - CAA1 - IaaS"
+        validate_certs: false
+      register: pr8_group_info
+      delegate_to: localhost
+
+    - name: Gather CAA1 cluster information
+      community.vmware.vmware_cluster_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        port: "{{ vcenter_port }}"
+        validate_certs: false
+        cluster_name: "{{ pr8.cluster }}"
+      register: cAA1_cluster_info
+      delegate_to: localhost
+
+    - name: Show CAA1 cluster information
+      ansible.builtin.debug:
+        var: cAA1_cluster_info
+
+    - name: Show CAA1 group information
+      ansible.builtin.debug:
+        var: pr8_group_info
+
+    - name: DEBUG - Show CAA1 cluster variable
+      ansible.builtin.debug:
+        msg:
+          - "pr8.cluster = {{ pr8.cluster }}"
+          - "vCenter = {{ vcenter_hostname }}"
+
+
+
+    - name: Gather DRS groups - test CAA2 cluster
+      community.vmware.vmware_drs_group_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        port: "{{ vcenter_port }}"
+        cluster_name: "Test - CAA2 - IaaS"
+        validate_certs: false
+      register: caa2_group_info
+      delegate_to: localhost
+
+    - name: Show CAA2 DRS groups
+      ansible.builtin.debug:
+        var: caa2_group_info
+
+    - name: Show CAA1 DRS groups
+      ansible.builtin.debug:
+        msg: >-
+          {{
+            'No DRS groups configured'
+            if (pr8_group_info.drs_group_info[pr8.cluster] | length == 0)
+            else pr8_group_info.drs_group_info[pr8.cluster]
+          }}
+
+    - name: Show CAA1 DRS rules
+      ansible.builtin.debug:
+        msg: >-
+          {{
+            'No DRS rules configured'
+            if (pr8_rule_info.drs_rule_info[pr8.cluster] | length == 0)
+            else pr8_rule_info.drs_rule_info[pr8.cluster]
+          }}
