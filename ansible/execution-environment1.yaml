@@ -405,6 +405,23 @@
       ansible.builtin.debug:
         var: cmd_vmware_support.stdout_lines
 
+    - name: Show community.vmware version
+      ansible.builtin.shell: |
+        ROOT="${ANSIBLE_COLLECTIONS_PATHS%%:*}"
+        MANIFEST="$ROOT/ansible_collections/community/vmware/MANIFEST.json"
+
+        if [ -f "$MANIFEST" ]; then
+          grep -i '"version"' "$MANIFEST"
+        else
+          echo "MANIFEST NOT FOUND: $MANIFEST"
+        fi
+      register: vmware_version
+      changed_when: false
+      failed_when: false
+
+    - name: Display community.vmware version
+      ansible.builtin.debug:
+        var: vmware_version.stdout
 
     # ============================================================
     # 17. Final summary
