@@ -1,0 +1,46 @@
+- name: Show Ansible version
+  ansible.builtin.command: ansible --version
+  register: ansible_ver
+  changed_when: false
+
+- name: Show Python version
+  ansible.builtin.command: python3 --version
+  register: python_ver
+  changed_when: false
+
+- name: Show Python executable
+  ansible.builtin.command: which python3
+  register: python_path
+  changed_when: false
+
+- name: Show community.vmware metadata
+  ansible.builtin.shell: |
+    find /tmp /var/lib/awx/.ansible/collections /usr/share/ansible/collections \
+      -path '*/ansible_collections/community/vmware/*' \
+      \( -name 'galaxy.yml' -o -name 'MANIFEST.json' \) \
+      -print 2>/dev/null
+  register: vmware_metadata
+  changed_when: false
+
+- name: Show VMware collection version
+  ansible.builtin.shell: |
+    for f in $(find /tmp /var/lib/awx/.ansible/collections /usr/share/ansible/collections \
+      -path '*/ansible_collections/community/vmware/*' \
+      \( -name 'galaxy.yml' -o -name 'MANIFEST.json' \) 2>/dev/null); do
+      echo "===== $f ====="
+      grep -E '"version"|version:' "$f" 2>/dev/null | head
+    done
+  register: vmware_version
+  changed_when: false
+
+- name: Display environment
+  ansible.builtin.debug:
+    msg:
+      - "ANSIBLE:"
+      - "{{ ansible_ver.stdout_lines }}"
+      - "PYTHON: {{ python_ver.stdout }}"
+      - "PYTHON PATH: {{ python_path.stdout }}"
+      - "VMWARE METADATA:"
+      - "{{ vmware_metadata.stdout_lines }}"
+      - "VMWARE VERSION:"
+      - "{{ vmware_version.stdout_lines }}"
