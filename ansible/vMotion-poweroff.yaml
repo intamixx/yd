@@ -16,42 +16,80 @@
 
   tasks:
 
-    - name: Find VM by name
+    # ============================================================
+    # Find all VMs
+    # community.vmware 1.7.0 does not support vm_name on
+    # vmware_vm_info, so we retrieve the list and filter it.
+    # ============================================================
+
+    - name: Get VMware VM information
       community.vmware.vmware_vm_info:
         hostname: "{{ vcenter_hostname }}"
         username: "{{ vcenter_username }}"
         password: "{{ vcenter_password }}"
         validate_certs: false
-        vm_name: "{{ vm_name }}"
-      register: vm_lookup
+        vm_type: vm
+      delegate_to: localhost
+      register: vm_info
+
+    - name: Find VM matching requested name
+      ansible.builtin.set_fact:
+        matching_vms: >-
+          {{
+            vm_info.virtual_machines
+            | selectattr('guest_name', 'equalto', vm_name)
+            | list
+          }}
+
+    - name: Display matching VM count
+      ansible.builtin.debug:
+        msg:
+          - "Requested VM: {{ vm_name }}"
+          - "Matching VMs found: {{ matching_vms | length }}"
+
+
+    # ============================================================
+    # Verify exactly one VM was found
+    # ============================================================
 
     - name: Verify exactly one VM was found
       ansible.builtin.assert:
         that:
-          - vm_lookup.virtual_machines is defined
-          - vm_lookup.virtual_machines | length == 1
+          - matching_vms | length == 1
         fail_msg: >-
           Expected exactly one VM named '{{ vm_name }}',
-          but found {{
-            vm_lookup.virtual_machines | default([]) | length
-          }}.
+          but found {{ matching_vms | length }}.
+
+          Matching VMs:
+          {{ matching_vms | map(attribute='guest_name') | list }}
+
+
+    # ============================================================
+    # Save VM information
+    # ============================================================
 
     - name: Set VM information
       ansible.builtin.set_fact:
-        vm_before: "{{ vm_lookup.virtual_machines[0] }}"
-        vm_moid: "{{ vm_lookup.virtual_machines[0].moid }}"
+        vm_before: "{{ matching_vms[0] }}"
+        vm_moid: "{{ matching_vms[0].moid }}"
 
     - name: Display VM before power down
       ansible.builtin.debug:
         msg:
           - "=========================================="
           - "VM FOUND"
+          - "=========================================="
           - "VM: {{ vm_name }}"
           - "MoID: {{ vm_moid }}"
           - "Cluster: {{ vm_before.cluster | default('N/A') }}"
           - "Host: {{ vm_before.esxi_hostname | default('N/A') }}"
           - "Power state: {{ vm_before.power_state }}"
           - "=========================================="
+
+
+    # ============================================================
+    # Verify current power state
+    # ============================================================
 
     - name: Verify VM is currently powered on
       ansible.builtin.assert:
@@ -60,6 +98,11 @@
         fail_msg: >-
           VM '{{ vm_name }}' is not powered on.
           Current state: {{ vm_before.power_state }}
+
+
+    # ============================================================
+    # Power off VM
+    # ============================================================
 
     - name: Power down VM
       community.vmware.vmware_guest_powerstate:
@@ -70,31 +113,70 @@
         moid: "{{ vm_moid }}"
         state: powered-off
         state_change_timeout: 300
+      delegate_to: localhost
 
-    - name: Wait for VM power state to settle
+
+    # ============================================================
+    # Give vCenter a moment to update inventory state
+    # ============================================================
+
+    - name: Wait for vCenter power state update
       ansible.builtin.pause:
         seconds: 5
 
-    - name: Refresh VM information
+
+    # ============================================================
+    # Refresh VM information
+    # ============================================================
+
+    - name: Refresh VMware VM information
       community.vmware.vmware_vm_info:
         hostname: "{{ vcenter_hostname }}"
         username: "{{ vcenter_username }}"
         password: "{{ vcenter_password }}"
         validate_certs: false
-        vm_name: "{{ vm_name }}"
-      register: vm_after_lookup
+        vm_type: vm
+      delegate_to: localhost
+      register: vm_after_info
+
+
+    # ============================================================
+    # Find the VM again
+    # ============================================================
+
+    - name: Find VM after power down
+      ansible.builtin.set_fact:
+        matching_vms_after: >-
+          {{
+            vm_after_info.virtual_machines
+            | selectattr('guest_name', 'equalto', vm_name)
+            | list
+          }}
 
     - name: Verify VM still exists
       ansible.builtin.assert:
         that:
-          - vm_after_lookup.virtual_machines is defined
-          - vm_after_lookup.virtual_machines | length == 1
+          - matching_vms_after | length == 1
         fail_msg: >-
-          VM '{{ vm_name }}' could not be found after the power-down operation.
+          VM '{{ vm_name }}' could not be uniquely located
+          after the power-down operation.
 
-    - name: Set post-powerdown information
+          Matching VMs found:
+          {{ matching_vms_after | length }}
+
+
+    # ============================================================
+    # Save post-powerdown information
+    # ============================================================
+
+    - name: Set post-powerdown VM information
       ansible.builtin.set_fact:
-        vm_after: "{{ vm_after_lookup.virtual_machines[0] }}"
+        vm_after: "{{ matching_vms_after[0] }}"
+
+
+    # ============================================================
+    # Verify power off succeeded
+    # ============================================================
 
     - name: Verify VM is powered off
       ansible.builtin.assert:
@@ -103,12 +185,17 @@
           - vm_after.power_state == "poweredOff"
         fail_msg: >-
           VM '{{ vm_name }}' did not power off successfully.
-          Current state: {{ vm_after.power_state }}
 
           MoID before: {{ vm_moid }}
           MoID after: {{ vm_after.moid | default('N/A') }}
 
-          Power state after: {{ vm_after.power_state | default('N/A') }}
+          Power state after:
+          {{ vm_after.power_state | default('N/A') }}
+
+
+    # ============================================================
+    # PASS
+    # ============================================================
 
     - name: Display powerdown PASS
       ansible.builtin.debug:
