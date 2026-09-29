@@ -1,0 +1,118 @@
+---
+- name: Power on VM after reverse vMotion
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - group_vars/vars.yaml
+    - group_vars/vault.yaml
+
+  vars:
+    vm_name: "TEMPLATE"
+
+  collections:
+    - community.vmware
+
+  tasks:
+
+    - name: Find VM by name
+      community.vmware.vmware_vm_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        vm_name: "{{ vm_name }}"
+      delegate_to: localhost
+      register: vm_lookup
+
+    - name: Verify exactly one VM was found
+      ansible.builtin.assert:
+        that:
+          - vm_lookup.virtual_machines | length == 1
+        fail_msg: >-
+          Expected exactly one VM named '{{ vm_name }}',
+          but found {{ vm_lookup.virtual_machines | length }}.
+
+    - name: Set VM information
+      ansible.builtin.set_fact:
+        vm_moid: "{{ vm_lookup.virtual_machines[0].moid }}"
+        vm_before: "{{ vm_lookup.virtual_machines[0] }}"
+
+    - name: Display VM before power on
+      ansible.builtin.debug:
+        msg:
+          - "VM: {{ vm_name }}"
+          - "MoID: {{ vm_moid }}"
+          - "Host: {{ vm_before.esxi_hostname }}"
+          - "Cluster: {{ vm_before.cluster }}"
+          - "Power state: {{ vm_before.power_state }}"
+
+#    - name: Verify VM is on CAA1
+#      ansible.builtin.assert:
+#        that:
+#          - vm_before.cluster == "Test - CAA1 - IaaS"
+#          - vm_before.esxi_hostname == "ngbw1vhesx6136.iaas.bbc.co.uk"
+#        fail_msg: >-
+#          VM '{{ vm_name }}' is not on the expected CAA1 host.
+#          Cluster: {{ vm_before.cluster }}
+#          Host: {{ vm_before.esxi_hostname }}
+
+    - name: Power on VM
+      community.vmware.vmware_guest_powerstate:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        moid: "{{ vm_moid }}"
+        state: powered-on
+      delegate_to: localhost
+
+    - name: Wait for VM to report powered on
+      community.vmware.vmware_guest_powerstate:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        moid: "{{ vm_moid }}"
+        state: powered-on
+        state_change_timeout: 300
+      delegate_to: localhost
+
+    - name: Refresh VM information
+      community.vmware.vmware_vm_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: false
+        vm_name: "{{ vm_name }}"
+      delegate_to: localhost
+      register: vm_after_lookup
+
+    - name: Set final VM information
+      ansible.builtin.set_fact:
+        vm_after: "{{ vm_after_lookup.virtual_machines[0] }}"
+
+    - name: Verify VM is powered on
+      ansible.builtin.assert:
+        that:
+          - vm_after.moid == vm_moid
+          - vm_after.power_state == "poweredOn"
+#          - vm_after.cluster == "Test - CAA1 - IaaS"
+#          - vm_after.esxi_hostname == "ngbw1vhesx6136.iaas.bbc.co.uk"
+        fail_msg: >-
+          VM '{{ vm_name }}' did not reach the expected final state.
+          Cluster: {{ vm_after.cluster }}
+          Host: {{ vm_after.esxi_hostname }}
+          Power state: {{ vm_after.power_state }}
+
+    - name: Display final PASS
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "POWER ON PASS"
+          - "VM: {{ vm_name }}"
+          - "MoID: {{ vm_after.moid }}"
+          - "Cluster: {{ vm_after.cluster }}"
+          - "Host: {{ vm_after.esxi_hostname }}"
+          - "Power state: {{ vm_after.power_state }}"
+          - "=========================================="
