@@ -34,9 +34,9 @@
       changed_when: false
       failed_when: false
 
-- name: Display VMware Python packages
-  ansible.builtin.debug:
-    var: cmd_python_packages.stdout_lines
+    - name: Display VMware Python packages
+      ansible.builtin.debug:
+        var: cmd_python_packages.stdout_lines
 
     # ============================================================
     # 1. Ansible version
