@@ -6,6 +6,38 @@
 
   tasks:
 
+# ============================================================
+# Install VMware Python dependencies
+# ============================================================
+
+    - name: Install VMware Python dependencies
+      ansible.builtin.pip:
+        name:
+          - pyvmomi
+          - packaging
+        state: present
+        executable: pip3
+
+# ============================================================
+# Show Python VMware packages
+# ============================================================
+
+    - name: Show installed VMware Python packages
+      ansible.builtin.shell: |
+        python3 -m pip list 2>/dev/null |
+        grep -Ei \
+          'ansible|vmware|pyvmomi|vsphere|packaging|setuptools|distlib' \
+          || true
+
+        exit 0
+      register: cmd_python_packages
+      changed_when: false
+      failed_when: false
+
+- name: Display VMware Python packages
+  ansible.builtin.debug:
+    var: cmd_python_packages.stdout_lines
+
     # ============================================================
     # 1. Ansible version
     # ============================================================
