@@ -7,24 +7,12 @@
   tasks:
 
 # ============================================================
-# Install VMware Python dependencies
-# ============================================================
-
-    - name: Install VMware Python dependencies
-      ansible.builtin.pip:
-        name:
-          - pyvmomi
-          - packaging
-        state: present
-        executable: pip3
-
-# ============================================================
 # Show Python VMware packages
 # ============================================================
 
     - name: Show installed VMware Python packages
       ansible.builtin.shell: |
-        python3 -m pip list 2>/dev/null |
+        python3.12 -m pip list 2>/dev/null |
         grep -Ei \
           'ansible|vmware|pyvmomi|vsphere|packaging|setuptools|distlib' \
           || true
@@ -60,14 +48,14 @@
 
     - name: Get Python version
       ansible.builtin.command:
-        cmd: python3 --version
+        cmd: python3.12 --version
       register: cmd_python_version
       changed_when: false
       failed_when: false
 
     - name: Get Python executable
       ansible.builtin.command:
-        cmd: which python3
+        cmd: which python3.12
       register: cmd_python_path
       changed_when: false
       failed_when: false
@@ -259,7 +247,7 @@
     - name: Test Python LooseVersion
       ansible.builtin.command:
         cmd: >
-          python3 -c
+          python3.12 -c
           "from distutils.version import LooseVersion;
           print(LooseVersion('1.0'))"
       register: cmd_looseversion
@@ -281,7 +269,7 @@
     - name: Test Python packaging
       ansible.builtin.command:
         cmd: >
-          python3 -c
+          python3.12 -c
           "import packaging;
           print(packaging.__version__)"
       register: cmd_packaging
@@ -303,7 +291,7 @@
     - name: Test pyVmomi
       ansible.builtin.command:
         cmd: >
-          python3 -c
+          python3.12 -c
           "import pyVmomi;
           print(pyVmomi.__file__)"
       register: cmd_pyvmomi
@@ -324,7 +312,7 @@
 
     - name: Show installed VMware Python packages
       ansible.builtin.shell: |
-        python3 -m pip list 2>/dev/null |
+        python3.12 -m pip list 2>/dev/null |
         grep -Ei \
           'ansible|vmware|pyvmomi|vsphere|packaging|setuptools|distlib' \
           || true
@@ -345,7 +333,7 @@
 
     - name: Test VMware-related Python imports
       ansible.builtin.shell: |
-        python3 - <<'PY'
+        python3.12 - <<'PY'
         import sys
 
         print("Python:", sys.version)
