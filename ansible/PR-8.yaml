@@ -1,0 +1,361 @@
+---
+- name: Validate SCCM PR-8
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - group_vars/vault.yaml
+    - group_vars/vars.yaml
+
+  vars:
+
+    # ========================================================
+    # VCENTER
+    # ========================================================
+
+#    vcenter_hostname: "127.0.0.1"
+#    vcenter_username: "user"
+#    vcenter_password: "pass"
+#    vcenter_port: 8989
+#
+    datacenter_name: "DC0"
+
+
+    # ========================================================
+    # PR-8
+    #
+    # Production Cluster 1
+    #
+    # hrp-wld2-cluster1
+    #   SCCOPS001-AP1
+    #     BGB01AP1519
+    # ========================================================
+
+    pr8:
+      cluster: "hrp-wld2-cluster1"
+      resource_pool: "SCCOPS001-AP1"
+      vms:
+        - "BGB01AP1519"
+#    pr8:
+#      cluster: "Test - CAA1 - IaaS"
+#      resource_pool: "CAA1 - Test"
+#      vms:
+#        - "BCDRTestVM-1"
+#        - "TEMPLATE"
+
+    # ========================================================
+    # PR-9
+    #
+    # Production Cluster 1
+    #
+    # VM Group:
+    #   SCCOPS001-GP1
+    #
+    # Host Group:
+    #   Cluster1-AZ1-Host
+    #
+    # Rule:
+    #   SCCOPS001-HA1
+    #   SHOULD RUN
+    # ========================================================
+
+    pr9:
+      cluster: "hrp-wld2-cluster1"
+
+      vm_group: "SCCOPS001-GP1"
+
+      vm:
+        - "BGB01AP1519"
+
+      host_group: "Cluster1-AZ1-Host"
+
+      hosts:
+        - "DC0_C1_H0"
+        - "DC0_C1_H1"
+
+      rule: "SCCOPS001-HA1"
+
+
+    # ========================================================
+    # PR-10
+    #
+    # Cluster 2
+    #
+    # hrp-wld2-cluster2-az1
+    #   SCCOPS001-AP2
+    #     BDC02AP1001
+    #     BDC02CN1001
+    # ========================================================
+
+    pr10:
+      cluster: "hrp-wld2-cluster2-az1"
+      resource_pool: "SCCOPS001-AP2"
+
+      vms:
+        - "BDC02AP1001"
+        - "BDC02CN1001"
+
+
+    # ========================================================
+    # PR-11
+    #
+    # Cluster 3
+    #
+    # hrp-wld2-cluster3-az2
+    #
+    # Following the PR-11 requirement as originally supplied:
+    # SCCOPS001-AP2
+    #
+    # If FB-6 is authoritative instead, change AP2 to AP3.
+    # ========================================================
+
+    pr11:
+      cluster: "hrp-wld2-cluster3-az2"
+      resource_pool: "SCCOPS001-AP2"
+
+      vms:
+        - "BDC03AP1001"
+        - "BDC03CN1001"
+
+
+    # ========================================================
+    # PR-12
+    #
+    # BCDR Cluster
+    #
+    # hrp-wld2-cluster4-dr1
+    #   SCCOPS001-AP4
+    # ========================================================
+
+    pr12:
+      cluster: "hrp-wld2-cluster4-dr1"
+      resource_pool: "SCCOPS001-AP4"
+
+
+    # ========================================================
+    # PR-13
+    #
+    # BCDR Cluster
+    #
+    # VM Group:
+    #   SCCOPS001-GP1
+    #
+    # Host Group:
+    #   Cluster4-AZ1-Host
+    #
+    # Rule:
+    #   SCCOPS001-HA1
+    #   SHOULD RUN
+    # ========================================================
+
+    pr13:
+      cluster: "hrp-wld2-cluster4-dr1"
+
+      vm_group: "SCCOPS001-GP1"
+
+      vm:
+        - "BGB01AP1519"
+
+      host_group: "Cluster4-AZ1-Host"
+
+      hosts:
+        - "DC0_C0_H0"
+        - "DC0_C0_H1"
+
+      rule: "SCCOPS001-HA1"
+
+
+    # ========================================================
+    # PR-14
+    #
+    # BCDR Cluster
+    #
+    # VM Group:
+    #   Cluster4-AZ1-VM
+    #
+    # Host Group:
+    #   Cluster4-AZ1-Host
+    #
+    # Rule:
+    #   Cluster4-AZ1-VM
+    #   MUST RUN
+    # ========================================================
+
+    pr14:
+      cluster: "hrp-wld2-cluster4-dr1"
+
+      vm_group: "Cluster4-AZ1-VM"
+
+      vms:
+        - "BDC02AP1001"
+        - "BDC02CN1001"
+
+      host_group: "Cluster4-AZ1-Host"
+
+      rule: "Cluster4-AZ1-VM"
+
+
+  tasks:
+
+    # ========================================================
+    # VM INVENTORY
+    # ========================================================
+
+    - name: Gather VMware VM inventory
+      community.vmware.vmware_vm_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        port: "{{ vcenter_port }}"
+        validate_certs: false
+      register: vm_info
+      delegate_to: localhost
+
+
+    # ========================================================
+    # RESOURCE POOL INFORMATION
+    # ========================================================
+
+    - name: Gather VMware resource pool information
+      community.vmware.vmware_resource_pool_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        port: "{{ vcenter_port }}"
+        validate_certs: false
+      register: resource_pool_info
+      delegate_to: localhost
+
+    # ========================================================
+    # BUILD RESOURCE POOL LOOKUP
+    # ========================================================
+
+    - name: Build resource pool lookup
+      ansible.builtin.set_fact:
+        resource_pool_by_name: >-
+          {{
+            dict(
+              resource_pool_info.resource_pool_info
+              | map(attribute='name')
+              | zip(resource_pool_info.resource_pool_info)
+            )
+          }}
+
+    # ========================================================
+    # BUILD VM LOOKUP
+    # ========================================================
+
+    - name: Build VM lookup by guest name
+      ansible.builtin.set_fact:
+        vm_by_name: >-
+          {{
+            dict(
+              vm_info.virtual_machines
+              | map(attribute='guest_name')
+              | zip(vm_info.virtual_machines)
+            )
+          }}
+
+    - name: Show resource pool info
+      ansible.builtin.debug:
+        var: resource_pool_info
+
+    # ========================================================
+    # PR-8
+    # ========================================================
+
+    - name: "PR-8 - Check VM exists"
+      ansible.builtin.assert:
+        that:
+          - item in vm_by_name
+        fail_msg: >-
+          PR-8 FAIL:
+          VM '{{ item }}' does not exist.
+        success_msg: >-
+          PR-8 PASS:
+          VM '{{ item }}' exists.
+      loop: "{{ pr8.vms }}"
+      loop_control:
+        label: "{{ item }}"
+
+        #    - name: "PR-8 - List all found VMs"
+        #      ansible.builtin.debug:
+        #        msg: "{{ vm_by_name.keys() | list | sort }}"
+
+    - name: "PR-8 - List all found VMs"
+      ansible.builtin.debug:
+        msg:
+          vm: "{{ item.key }}"
+          cluster: "{{ item.value.cluster | default('N/A') }}"
+          group: "{{ item.value.group | default('N/A') }}"
+          resource_pool: "{{ item.value.resource_pool | default('N/A') }}"
+      loop: "{{ vm_by_name | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+        #    - name: "PR-8 - Check cluster"
+        #      ansible.builtin.assert:
+        #        that:
+        #          - vm_by_name[item].cluster == pr8.cluster
+        #        fail_msg: >-
+        #          PR-8 FAIL:
+        #          {{ item }} is in cluster
+        #          '{{ vm_by_name[item].cluster }}',
+        #          expected '{{ pr8.cluster }}'.
+        #        success_msg: >-
+        #          PR-8 PASS:
+        #          {{ item }} is in {{ pr8.cluster }}.
+        #      loop: "{{ pr8.vms }}"
+        #      loop_control:
+        #        label: "{{ item }}"
+
+    - name: "PR-8 - Find matching VM"
+      ansible.builtin.set_fact:
+        matching_vms: >-
+          {{
+            vm_info.virtual_machines
+            | selectattr('guest_name', 'equalto', item)
+            | selectattr('cluster', 'equalto', pr8.cluster)
+            | selectattr('resource_pool', 'equalto', pr8.resource_pool)
+            | list
+          }}
+      loop: "{{ pr8.vms }}"
+
+    - name: "PR-8 - Check resource pool exists"
+      ansible.builtin.assert:
+        that:
+          - pr8.resource_pool in resource_pool_by_name
+        fail_msg: >-
+          PR-8 FAIL:
+          resource pool '{{ pr8.resource_pool }}' does not exist.
+        success_msg: >-
+          PR-8 PASS:
+          resource pool '{{ pr8.resource_pool }}' exists.
+
+    - name: "PR-8 - Check VM placement"
+      ansible.builtin.assert:
+        that:
+          - matching_vms | length == 1
+        fail_msg: >-
+          PR-8 FAIL: {{ item }} has {{ matching_vms | length }}
+          matching VM objects for cluster '{{ pr8.cluster }}'
+          and resource pool '{{ pr8.resource_pool }}'.
+        success_msg: >-
+          PR-8 PASS: {{ item }} found in
+          '{{ pr8.cluster }}/{{ pr8.resource_pool }}'.
+      loop: "{{ pr8.vms }}"
+
+#    - name: "PR-8 - Check resource pool association"
+#      ansible.builtin.assert:
+#        that:
+#          - vm_by_name[item].resource_pool == pr8.resource_pool
+#        fail_msg: >-
+#          PR-8 FAIL:
+#          {{ item }} is in resource pool
+#          '{{ vm_by_name[item].resource_pool }}',
+#          expected '{{ pr8.resource_pool }}'.
+#        success_msg: >-
+#          PR-8 PASS:
+#          {{ item }} is in {{ pr8.resource_pool }}.
+#      loop: "{{ pr8.vms }}"
+#      loop_control:
+#        label: "{{ item }}"
